@@ -1,0 +1,163 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider          = "mysql"
+    url               = env("DATABASE_URL")
+    shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+    relationMode      = "prisma"
+}
+
+model User {
+    id String @id @default(uuid())
+
+    isAdmin        Boolean      @default(false)
+    Admin          Admin?
+    Participant    Participant?
+    name           String       @db.VarChar(255)
+    email          String       @unique
+    avatarUrl      String
+    college        String
+    graduationYear Int
+    branch         String
+    degree         String
+    discordId      String?      @unique
+    githubId       String       @unique
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @updatedAt
+    deletedAt      DateTime?
+
+    @@index([githubId])
+}
+
+model Admin {
+    id String @id @default(uuid())
+
+    user   User    @relation(fields: [userId], references: [githubId])
+    userId String  @unique
+    Event  Event[]
+    Repo   Repo[]
+}
+
+model Participant {
+    id String @id @default(uuid())
+
+    User               User               @relation(fields: [participantId], references: [githubId])
+    participantId      String             @unique
+    PR                 PR[]
+    Issue              Issue[]
+    LeaderboardEntries LeaderboardEntry[]
+}
+
+model Event {
+    id String @id @default(cuid())
+
+    creator            Admin              @relation(fields: [creatorId], references: [userId])
+    creatorId          String
+    name               String             @unique
+    description        String?
+    startDate          DateTime           @default(now())
+    endDate            DateTime?
+    createdAt          DateTime           @default(now())
+    updatedAt          DateTime           @updatedAt
+    deletedAt          DateTime?
+    Repo               Repo[]
+    LeaderBoardEntries LeaderboardEntry[]
+    logoImageURL       String?
+    coverImagesURL     coverImageURL[]
+
+    @@index([creatorId])
+}
+
+model coverImageURL {
+    id        Int    @id @default(autoincrement())
+    url       String @unique
+    eventName String
+    event     Event  @relation(fields: [eventName], references: [name])
+
+    @@index([eventName])
+}
+
+model LeaderboardEntry {
+    id            String      @id @default(uuid())
+    Participant   Participant @relation(fields: [participantId], references: [participantId])
+    participantId String
+    event         Event       @relation(fields: [eventName], references: [name])
+    eventName     String
+    points        Int         @default(0)
+    PRmerged      Int         @default(0)
+
+    @@unique([participantId, eventName])
+    @@index([eventName])
+}
+
+model Repo {
+    id String @id @default(uuid())
+
+    creator     Admin     @relation(fields: [creatorId], references: [userId])
+    creatorId   String
+    event       Event     @relation(fields: [eventName], references: [name])
+    eventName   String
+    issues      Issue[]
+    name        String    @unique
+    description String?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+    deletedAt   DateTime?
+
+    @@index([creatorId])
+    @@index([eventName])
+}
+
+enum IssueStatus {
+    OPEN
+    CLOSED
+    ASSIGNED
+}
+
+model Issue {
+    id String @id @default(uuid())
+
+    repo          Repo         @relation(fields: [repoName], references: [name])
+    repoName      String
+    PR            PR[]
+    assignee      Participant? @relation(fields: [assigneeId], references: [participantId])
+    assigneeId    String?
+    issueNumber   Int // from github
+    title         String
+    status        IssueStatus  @default(OPEN)
+    openForAll    Boolean      @default(false)
+    currentPoints Int          @default(0)
+    createdAt     DateTime     @default(now())
+    updatedAt     DateTime     @updatedAt
+    deletedAt     DateTime?
+
+    @@unique([repoName, issueNumber])
+    @@index([assigneeId])
+}
+
+enum PRStatus {
+    MERGED
+    OPENED
+    REJECTED
+}
+
+model PR {
+    id BigInt @id
+
+    title       String
+    submitter   Participant @relation(fields: [submitterId], references: [participantId])
+    submitterId String
+    issue       Issue       @relation(fields: [issueId], references: [id])
+    issueId     String
+    prNumber    Int
+    points      Int
+    status      PRStatus    @default(OPENED)
+
+    @@index([submitterId])
+    @@index([issueId])
+}

@@ -304,19 +304,26 @@ const issueCommentCreated = async (req, res) => {
         // Fetch issues for each user (simulated for demonstration purposes)
         const userIssueData = await Promise.all(
             uniqueUsers.map(async (user) => {
-                // Replace this with actual data fetching for issues assigned to the user
+                const issues = await prisma.issue.findMany({
+                    where: { assigneeId: user },
+                    select: {
+                        title: true,
+                        repoName: true,
+                        status: true
+                    }
+                });
+
                 return {
                     user,
-                    issues: [
-                        {
-                            title: `Issue for ${user}`,
-                            repoName: repoName,
-                            status: 'Open',
-                        },
-                    ],
+                    issues: issues.map(issue => ({
+                        title: issue.title,
+                        repoName: issue.repoName,
+                        status: issue.status
+                    }))
                 };
             })
         );
+
 
         // Generate a Markdown table
         const tableHeader = '| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n';

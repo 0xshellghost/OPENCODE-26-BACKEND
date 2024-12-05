@@ -151,7 +151,6 @@ const issueLabeled = async (req, res) => {
         const repoName = req.body.repository.name;
         const label = req.body.label.name.trim().toLowerCase();
         const openForAll =
-            label === 'everyone' ||
             label === 'open-for-all' ||
             label === 'competitive';
         const currentPoints = parseInt(label.match(/\d+/)?.at(0) ?? 0, 10);
@@ -360,17 +359,22 @@ const pullRequestOpened = async (req, res) => {
         const githubId = req.body.pull_request.user.login;
         const repoName = req.body.repository.name;
         const { body, number: PRNumber, title, id } = req.body.pull_request;
-        console.log(id);
-        
-        const issueNumber = parseInt(body.match(/Issue\s*:\s*#(\d+)/i)?.[1],10);
-        console.log(issueNumber);
-        if (issueNumber) {
+        let issueNumber=0;
+        if(/Issue\s*:\s*#(\d+)/i.test(body)){
+            console.log("2");
+            const match = body.match(/Issue\s*:\s*#(\d+)/i);
+            issueNumber = match ? parseInt(match[1], 10) : null;
+        }
+        //const issueNumber = parseInt(body.match(/Issue\s*:\s*#(\d+)/i)?.[1],10);
+        //console.log("issue num " + issueNumber);
+        if (issueNumber!==0) {
+            console.log("4");
+
             const participant = await prisma.participant.findUnique({
                 where: {
                     participantId: githubId
                 }
             });
-
             if (!participant) {
                 commentOnAPullRequest(
                     repoName,
@@ -467,7 +471,7 @@ const pullRequestOpened = async (req, res) => {
             commentOnAPullRequest(
                 repoName,
                 PRNumber,
-                commentBuilder(TEMPLATE_NOT_FOLLOWED_ERROR)
+                commentBuilder(githubId,TEMPLATE_NOT_FOLLOWED_ERROR)
             );
         }
         return res.status(200).json();

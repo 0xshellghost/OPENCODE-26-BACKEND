@@ -10,7 +10,8 @@ import {
     NOT_REGISTERED_ASSIGNED_ERROR,
     PR_OPEN_SUCCESS,
     PR_OPENED_UNREGISTERED_ERROR,
-    TEMPLATE_NOT_FOLLOWED_ERROR
+    TEMPLATE_NOT_FOLLOWED_ERROR,
+    MAX_ISSUE_LIMIT
 } from '../utils/comments.js';
 import {commentOnAnIssue, fetchCommentsFromGitHub} from '../utils/commentOnAnIssue.js';
 export const routerFunction = (req, res) => {
@@ -289,43 +290,63 @@ const issueCommentCreated = async (req, res) => {
         const issueNumber = req.body.issue.number;
         const repoName = req.body.repository.name;
         const commentBody = req.body.comment.body;
-        if (!commentBody.startsWith('/info')) {
+        if (commentBody.startsWith('/assign')) {
+            const assignee = req.body.issue.user.login; 
+            console.log(assignee);
+            
+            if (!assignee) {
+                return res.status(400).json({ error: 'No assignee specified in the command.' });
+            }
+
+            const activeIssues = await prisma.issue.findMany({
+                where: {
+                    assigneeId: assignee,
+                    status: 'ASSIGNED', 
+                },
+            });
+
+            if (activeIssues.length >= 3) {
+                await commentOnAnIssue(repoName, issueNumber, commentBuilder(assignee, MAX_ISSUE_LIMIT));
+                return res.status(200).json();
+            }
             return res.status(200).json();
         }
 
-        const comments = await fetchCommentsFromGitHub('geekhaven-test', repoName, issueNumber);
-        const uniqueUsers = [...new Set(comments.map(comment => comment.user.login))];
-        const userIssueData = await Promise.all(
-            uniqueUsers.map(async (user) => {
-                const issues = await prisma.issue.findMany({
-                    where: { assigneeId: user },
-                    select: {
-                        title: true,
-                        repoName: true,
-                        status: true
-                    }
-                });
+        if (commentBody.startsWith('/info')) {
+            const comments = await fetchCommentsFromGitHub( repoName, issueNumber);
+            const uniqueUsers = [...new Set(comments.map(comment => comment.user.login))];
+            const userIssueData = await Promise.all(
+                uniqueUsers.map(async (user) => {
+                    const issues = await prisma.issue.findMany({
+                        where: { assigneeId: user },
+                        select: {
+                            title: true,
+                            repoName: true,
+                            status: true
+                        }
+                    });
 
-                return {
-                    user,
-                    issues: issues.map(issue => ({
-                        title: issue.title,
-                        repoName: issue.repoName,
-                        status: issue.status
-                    }))
-                };
-            })
-        );
-        const tableHeader = '| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n';
-        const tableRows = userIssueData
-            .flatMap(({ user, issues }) =>
-                issues.map(issue => `| ${user} | ${issue.repoName} | ${issue.title} | ${issue.status} |`)
-            )
-            .join('\n');
+                    return {
+                        user,
+                        issues: issues.map(issue => ({
+                            title: issue.title,
+                            repoName: issue.repoName,
+                            status: issue.status
+                        }))
+                    };
+                })
+            );
+            const tableHeader = '| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n';
+            const tableRows = userIssueData
+                .flatMap(({ user, issues }) =>
+                    issues.map(issue => `| ${user} | ${issue.repoName} | ${issue.title} | ${issue.status} |`)
+                )
+                .join('\n');
 
-        const responseComment = tableHeader + tableRows;
-        await commentOnAnIssue('geekhaven-test', repoName, issueNumber, responseComment);
-
+            const responseComment = tableHeader + tableRows;
+            await commentOnAnIssue( repoName, issueNumber, responseComment);
+            return res.status(200).json();
+        }
         return res.status(200).json();
     } catch (error) {
         console.error('Error in issueCommentCreated:', error.message);
@@ -568,7 +589,7 @@ const pullRequestMerged = async (req, res) => {
             }
         });
         // OpenCode
-        const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing in OpenCode\'23 ✨✨`;
+        const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing in OpenCode\'24 ✨✨`;
         // GeekCamp
         //const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for participating in GeekCamp ✨✨`;
         commentOnAPullRequest(repoName, PRNumber, PR_MERGED);

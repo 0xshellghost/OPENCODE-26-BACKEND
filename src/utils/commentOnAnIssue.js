@@ -1,9 +1,11 @@
 import axios from "axios";
-export async function commentOnAnIssue(repoOwner, repoName, issueOrPRNumber, comment) {
+export async function commentOnAnIssue( repoName, issueNumber, comment) {
     try {
         const response = await axios.post(
-            `https://api.github.com/repos/${repoOwner}/${repoName}/issues/${issueOrPRNumber}/comments`,
-            { body: comment },
+            `https://api.github.com/repos/geekhaven-test/${repoName}/issues/${issueNumber}/comments`,
+            { 
+                body: comment 
+            },
             {
                 headers: {
                     Accept: 'application/vnd.github+json',
@@ -19,10 +21,10 @@ export async function commentOnAnIssue(repoOwner, repoName, issueOrPRNumber, com
     }
 }
 
-export async function fetchCommentsFromGitHub(repoOwner, repoName, issueNumber) {
+export async function fetchCommentsFromGitHub( repoName, issueNumber) {
     try {
         const response = await axios.get(
-            `https://api.github.com/repos/${repoOwner}/${repoName}/issues/${issueNumber}/comments`,
+            `https://api.github.com/repos/geekhaven-test/${repoName}/issues/${issueNumber}/comments`,
             {
                 headers: {
                     Accept: 'application/vnd.github+json',
@@ -30,11 +32,10 @@ export async function fetchCommentsFromGitHub(repoOwner, repoName, issueNumber) 
                 },
             }
         );
-        return response.data; // Returns an array of comments
+        return response.data;
     } catch (error) {
         console.error('Error fetching comments from GitHub:', error.message);
         throw error;
     }
 }
 
-//module.exports = commentOnAnIssue;

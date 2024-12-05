@@ -42,7 +42,16 @@ export const routerFunction = (req, res) => {
                     return res.status(200).json();
             }
             break;
-
+        case 'issue_comment':
+            switch (req.body.action) {
+                case 'created':
+                    issueCommentCreated(req, res);
+                    console.log("New comment created on issue or pull request");
+                    break;
+                default:
+                    return res.status(200).json();
+                }
+            break;
         case 'pull_request':
             switch (req.body.action) {
 
@@ -70,6 +79,7 @@ export const routerFunction = (req, res) => {
             return res.status(400);
     }
 };
+
 
 const issueAssigned = async (req, res) => {
     try {
@@ -271,6 +281,82 @@ const issueReopened = async (req, res) => {
         return res.status(200).json();
     }
 };
+
+const issueCommentCreated = async (req, res) => {
+    try {
+        const issueNumber = req.body.issue.number;
+        const repoName = req.body.repository.name;
+        const commentBody = req.body.comment.body;
+
+        // Check for the `/pr` command
+        if (!commentBody.startsWith("/pr")) {
+            return res.status(200).json(); // Not relevant, ignore
+        }
+
+        // Fetch all comments on the issue
+        const comments = await prisma.comment.findMany({
+            where: {
+                issueNumber: issueNumber,
+                repoName: repoName
+            },
+            select: {
+                authorId: true
+            }
+        });
+
+        // Extract unique user IDs
+        const uniqueUsers = [...new Set(comments.map(comment => comment.authorId))];
+
+        // Fetch issues for each user
+        const userIssueData = await Promise.all(
+            uniqueUsers.map(async (user) => {
+                const issues = await prisma.issue.findMany({
+                    where: { assigneeId: user },
+                    select: {
+                        title: true,
+                        repoName: true,
+                        status: true
+                    }
+                });
+
+                return {
+                    user,
+                    issues: issues.map(issue => ({
+                        title: issue.title,
+                        repoName: issue.repoName,
+                        status: issue.status
+                    }))
+                };
+            })
+        );
+
+        // Generate a Markdown table
+        const tableHeader = "| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n";
+        const tableRows = userIssueData
+            .flatMap(({ user, issues }) =>
+                issues.map(issue => `| ${user} | ${issue.repoName} | ${issue.title} | ${issue.status} |`)
+            )
+            .join("\n");
+
+        const responseComment = tableHeader + tableRows;
+
+        // Post the response comment
+        await prisma.comment.create({
+            data: {
+                issueNumber: issueNumber,
+                repoName: repoName,
+                body: responseComment,
+                authorId: "bot" // Replace with bot's ID or username
+            }
+        });
+
+        return res.status(200).json();
+    } catch (error) {
+        console.error(error);
+        return res.status(200).json();
+    }
+};
+
 
 const pullRequestOpened = async (req, res) => {
     try {

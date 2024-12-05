@@ -1,7 +1,6 @@
 import axios from 'axios';
 export async function commentOnAPullRequest(repoName, PRNumber, comment) {
     try {
-        //bache hue
         const response = await axios.post(
             `https://api.github.com/repos/geekhaven-test/${repoName}/issues/${PRNumber}/comments`,
             {

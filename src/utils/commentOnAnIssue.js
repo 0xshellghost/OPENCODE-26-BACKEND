@@ -1,5 +1,4 @@
-const axios = require('axios');
-
+import axios from "axios";
 /**
  * Posts a comment on a GitHub pull request or issue.
  * @param {string} repoOwner - The owner of the repository.
@@ -7,7 +6,7 @@ const axios = require('axios');
  * @param {number} issueOrPRNumber - The issue or pull request number.
  * @param {string} comment - The comment body to post.
  */
-async function commentOnAnIssue(repoOwner, repoName, issueOrPRNumber, comment) {
+export async function commentOnAnIssue(repoOwner, repoName, issueOrPRNumber, comment) {
     try {
         const response = await axios.post(
             `https://api.github.com/repos/${repoOwner}/${repoName}/issues/${issueOrPRNumber}/comments`,
@@ -23,6 +22,24 @@ async function commentOnAnIssue(repoOwner, repoName, issueOrPRNumber, comment) {
         return response.data; // Returning data for potential use
     } catch (error) {
         console.error('Error posting comment:', error.message);
+        throw error;
+    }
+}
+
+export async function fetchCommentsFromGitHub(repoOwner, repoName, issueNumber) {
+    try {
+        const response = await axios.get(
+            `https://api.github.com/repos/${repoOwner}/${repoName}/issues/${issueNumber}/comments`,
+            {
+                headers: {
+                    Accept: 'application/vnd.github+json',
+                    Authorization: `Bearer ${process.env.GITHUB_TOKEN_BOT}`,
+                },
+            }
+        );
+        return response.data; // Returns an array of comments
+    } catch (error) {
+        console.error('Error fetching comments from GitHub:', error.message);
         throw error;
     }
 }

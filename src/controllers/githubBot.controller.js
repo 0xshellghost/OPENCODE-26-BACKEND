@@ -12,7 +12,7 @@ import {
     PR_OPENED_UNREGISTERED_ERROR,
     TEMPLATE_NOT_FOLLOWED_ERROR
 } from '../utils/comments.js';
-import commentOnAnIssue from '../utils/commentOnAnIssue.js';
+import {commentOnAnIssue, fetchCommentsFromGitHub} from '../utils/commentOnAnIssue.js';
 export const routerFunction = (req, res) => {
     switch (req.headers['x-github-event']) {
         case 'issues':
@@ -283,7 +283,6 @@ const issueReopened = async (req, res) => {
     }
 };
 
-//const postCommentOnIssueOrPR = require('./path/to/postCommentOnIssueOrPR');
 
 const issueCommentCreated = async (req, res) => {
     try {
@@ -296,39 +295,25 @@ const issueCommentCreated = async (req, res) => {
             return res.status(200).json(); // Not relevant, ignore
         }
 
-        // Fetch all comments on the issue
-        const comments = await prisma.comment.findMany({
-            where: {
-                issueNumber: issueNumber,
-                repoName: repoName
-            },
-            select: {
-                authorId: true
-            }
-        });
+        // Fetch all comments from GitHub for the issue
+        const comments = await fetchCommentsFromGitHub('geekhaven-test', repoName, issueNumber);
 
         // Extract unique user IDs
-        const uniqueUsers = [...new Set(comments.map(comment => comment.authorId))];
+        const uniqueUsers = [...new Set(comments.map(comment => comment.user.login))];
 
-        // Fetch issues for each user
+        // Fetch issues for each user (simulated for demonstration purposes)
         const userIssueData = await Promise.all(
             uniqueUsers.map(async (user) => {
-                const issues = await prisma.issue.findMany({
-                    where: { assigneeId: user },
-                    select: {
-                        title: true,
-                        repoName: true,
-                        status: true
-                    }
-                });
-
+                // Replace this with actual data fetching for issues assigned to the user
                 return {
                     user,
-                    issues: issues.map(issue => ({
-                        title: issue.title,
-                        repoName: issue.repoName,
-                        status: issue.status
-                    }))
+                    issues: [
+                        {
+                            title: `Issue for ${user}`,
+                            repoName: repoName,
+                            status: 'Open',
+                        },
+                    ],
                 };
             })
         );
@@ -344,12 +329,12 @@ const issueCommentCreated = async (req, res) => {
         const responseComment = tableHeader + tableRows;
 
         // Post the response comment using the helper function
-        await commentOnAnIssue('geekhaven-test', repoName, issueNumber, responseComment);
+        await postCommentOnIssue('geekhaven-test', repoName, issueNumber, responseComment);
 
         return res.status(200).json();
     } catch (error) {
-        console.error(error);
-        return res.status(200).json();
+        console.error('Error in issueCommentCreated:', error.message);
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 };
 

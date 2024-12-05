@@ -12,6 +12,7 @@ import {
     PR_OPENED_UNREGISTERED_ERROR,
     TEMPLATE_NOT_FOLLOWED_ERROR
 } from '../utils/comments.js';
+import commentOnAnIssue from '../utils/commentOnAnIssue.js';
 export const routerFunction = (req, res) => {
     switch (req.headers['x-github-event']) {
         case 'issues':
@@ -282,6 +283,8 @@ const issueReopened = async (req, res) => {
     }
 };
 
+//const postCommentOnIssueOrPR = require('./path/to/postCommentOnIssueOrPR');
+
 const issueCommentCreated = async (req, res) => {
     try {
         const issueNumber = req.body.issue.number;
@@ -289,7 +292,7 @@ const issueCommentCreated = async (req, res) => {
         const commentBody = req.body.comment.body;
 
         // Check for the `/pr` command
-        if (!commentBody.startsWith("/pr")) {
+        if (!commentBody.startsWith('/pr')) {
             return res.status(200).json(); // Not relevant, ignore
         }
 
@@ -331,24 +334,17 @@ const issueCommentCreated = async (req, res) => {
         );
 
         // Generate a Markdown table
-        const tableHeader = "| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n";
+        const tableHeader = '| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n';
         const tableRows = userIssueData
             .flatMap(({ user, issues }) =>
                 issues.map(issue => `| ${user} | ${issue.repoName} | ${issue.title} | ${issue.status} |`)
             )
-            .join("\n");
+            .join('\n');
 
         const responseComment = tableHeader + tableRows;
 
-        // Post the response comment
-        await prisma.comment.create({
-            data: {
-                issueNumber: issueNumber,
-                repoName: repoName,
-                body: responseComment,
-                authorId: "bot" // Replace with bot's ID or username
-            }
-        });
+        // Post the response comment using the helper function
+        await commentOnAnIssue('geekhaven-test', repoName, issueNumber, responseComment);
 
         return res.status(200).json();
     } catch (error) {

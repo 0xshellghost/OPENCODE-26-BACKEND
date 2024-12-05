@@ -289,19 +289,12 @@ const issueCommentCreated = async (req, res) => {
         const issueNumber = req.body.issue.number;
         const repoName = req.body.repository.name;
         const commentBody = req.body.comment.body;
-
-        // Check for the `/pr` command
-        if (!commentBody.startsWith('/pr')) {
-            return res.status(200).json(); // Not relevant, ignore
+        if (!commentBody.startsWith('/info')) {
+            return res.status(200).json();
         }
 
-        // Fetch all comments from GitHub for the issue
         const comments = await fetchCommentsFromGitHub('geekhaven-test', repoName, issueNumber);
-
-        // Extract unique user IDs
         const uniqueUsers = [...new Set(comments.map(comment => comment.user.login))];
-
-        // Fetch issues for each user (simulated for demonstration purposes)
         const userIssueData = await Promise.all(
             uniqueUsers.map(async (user) => {
                 const issues = await prisma.issue.findMany({
@@ -323,9 +316,6 @@ const issueCommentCreated = async (req, res) => {
                 };
             })
         );
-
-
-        // Generate a Markdown table
         const tableHeader = '| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n';
         const tableRows = userIssueData
             .flatMap(({ user, issues }) =>
@@ -334,9 +324,7 @@ const issueCommentCreated = async (req, res) => {
             .join('\n');
 
         const responseComment = tableHeader + tableRows;
-
-        // Post the response comment using the helper function
-        await postCommentOnIssue('geekhaven-test', repoName, issueNumber, responseComment);
+        await commentOnAnIssue('geekhaven-test', repoName, issueNumber, responseComment);
 
         return res.status(200).json();
     } catch (error) {
@@ -580,9 +568,9 @@ const pullRequestMerged = async (req, res) => {
             }
         });
         // OpenCode
-        // const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing in OpenCode\'23 ✨✨`;
+        const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing in OpenCode\'23 ✨✨`;
         // GeekCamp
-        const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for participating in GeekCamp ✨✨`;
+        //const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for participating in GeekCamp ✨✨`;
         commentOnAPullRequest(repoName, PRNumber, PR_MERGED);
 
         return res.status(200).json();

@@ -1,11 +1,4 @@
 import axios from "axios";
-/**
- * Posts a comment on a GitHub pull request or issue.
- * @param {string} repoOwner - The owner of the repository.
- * @param {string} repoName - The name of the repository.
- * @param {number} issueOrPRNumber - The issue or pull request number.
- * @param {string} comment - The comment body to post.
- */
 export async function commentOnAnIssue(repoOwner, repoName, issueOrPRNumber, comment) {
     try {
         const response = await axios.post(
@@ -14,12 +7,12 @@ export async function commentOnAnIssue(repoOwner, repoName, issueOrPRNumber, com
             {
                 headers: {
                     Accept: 'application/vnd.github+json',
-                    Authorization: `Bearer ${process.env.GITHUB_TOKEN_BOT}`, // Add `Bearer` prefix
+                    Authorization: process.env.GITHUB_TOKEN_BOT,
                 },
             }
         );
         console.log('Comment posted successfully:', response.data);
-        return response.data; // Returning data for potential use
+        return response.data;
     } catch (error) {
         console.error('Error posting comment:', error.message);
         throw error;
@@ -33,7 +26,7 @@ export async function fetchCommentsFromGitHub(repoOwner, repoName, issueNumber) 
             {
                 headers: {
                     Accept: 'application/vnd.github+json',
-                    Authorization: `Bearer ${process.env.GITHUB_TOKEN_BOT}`,
+                    Authorization: `${process.env.GITHUB_TOKEN_BOT}`,
                 },
             }
         );
@@ -44,4 +37,4 @@ export async function fetchCommentsFromGitHub(repoOwner, repoName, issueNumber) 
     }
 }
 
-module.exports = commentOnAnIssue;
+//module.exports = commentOnAnIssue;

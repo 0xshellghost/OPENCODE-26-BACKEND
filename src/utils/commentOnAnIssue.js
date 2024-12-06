@@ -2,7 +2,7 @@ import axios from "axios";
 export async function commentOnAnIssue( repoName, issueNumber, comment) {
     try {
         const response = await axios.post(
-            `https://api.github.com/repos/geekhaven-test/${repoName}/issues/${issueNumber}/comments`,
+            `https://api.github.com/repos/GeekHaven/${repoName}/issues/${issueNumber}/comments`,
             { 
                 body: comment 
             },
@@ -24,7 +24,7 @@ export async function commentOnAnIssue( repoName, issueNumber, comment) {
 export async function fetchCommentsFromGitHub( repoName, issueNumber) {
     try {
         const response = await axios.get(
-            `https://api.github.com/repos/geekhaven-test/${repoName}/issues/${issueNumber}/comments`,
+            `https://api.github.com/repos/GeekHaven/${repoName}/issues/${issueNumber}/comments`,
             {
                 headers: {
                     Accept: 'application/vnd.github+json',

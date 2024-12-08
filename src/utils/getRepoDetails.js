@@ -6,7 +6,7 @@ export async function getRepoDetails(repoManagerName, repoName) {
         //change it back to production
         //bache hue
         const userRepo = await axios.get(
-            `https://api.github.com/repos/GeekHaven/${repoName}`,
+            `https://api.github.com/repos/${process.env.ORG_NAME}/${repoName}`,
             opts
         );
         return userRepo.data;

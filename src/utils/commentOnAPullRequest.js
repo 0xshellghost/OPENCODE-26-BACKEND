@@ -2,7 +2,7 @@ import axios from 'axios';
 export async function commentOnAPullRequest(repoName, PRNumber, comment) {
     try {
         const response = await axios.post(
-            `https://api.github.com/repos/GeekHaven/${repoName}/issues/${PRNumber}/comments`,
+            `https://api.github.com/repos/${process.env.ORG_NAME}/${repoName}/issues/${PRNumber}/comments`,
             {
                 body: comment
             },

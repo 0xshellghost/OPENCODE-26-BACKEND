@@ -15,11 +15,11 @@ import { getDataURI } from '../utils/dataURIparser.js';
 
 const createEvent = async (req, res) => {
     try {
-        const { title, description, startDate, endDate } = req.body;
-        console.log(req.body);
-        const { logoImage, coverImages } = req.files;
+        const { title, description, startDate, endDate , logoImage, coverImages } = req.body;
+
+        // validation -> return immediately after sending response
         if (!title || !description || !logoImage) {
-            response_400(
+            return response_400(
                 res,
                 'Title, description are required to create an event'
             );
@@ -44,8 +44,11 @@ const createEvent = async (req, res) => {
                     public_id: `eventImage-${title}`
                 }
             );
+
+            // guard coverImages to avoid calling .map on undefined
+            const coverImagesArray = Array.isArray(coverImages) ? coverImages : [];
             const coverImageLinks = await Promise.all(
-                coverImages.map(async (coverImage, idx) => {
+                coverImagesArray.map(async (coverImage, idx) => {
                     const coverImageCloudinary = (await getDataURI(coverImage))
                         .content;
                     const imageUpload = await cloudinary.uploader.upload(
@@ -74,15 +77,17 @@ const createEvent = async (req, res) => {
                     startDate: startDate,
                     endDate: endDate,
                     logoImageURL: imageUpload.secure_url,
-                    coverImagesURL: {
-                        createMany: {
-                            data: coverImageLinks.map((coverImage) => {
-                                return {
-                                    url: coverImage
-                                };
-                            })
+                    coverImagesURL: coverImageLinks.length
+                        ? {
+                            createMany: {
+                                data: coverImageLinks.map((coverImage) => {
+                                    return {
+                                        url: coverImage
+                                    };
+                                })
+                            }
                         }
-                    }
+                        : undefined
                 },
                 select: {
                     coverImagesURL: true,
@@ -94,12 +99,12 @@ const createEvent = async (req, res) => {
                 }
             });
 
-            response_201(res, 'Event created successfully', data);
+            return response_201(res, 'Event created successfully', data);
         } else {
-            response_403(res, 'Only admins can create events');
+            return response_403(res, 'Only admins can create events');
         }
     } catch (error) {
-        response_500(res, 'Error while creating event', error);
+        return response_500(res, 'Error while creating event', error);
     }
 };
 

@@ -77,11 +77,26 @@ export const routerFunction = (req, res) => {
             }
             break;
 
+        case 'push' :
+            push(req, res)
+            console.log("SOMETHING PUSGED");
+            break;
+
         default:
             return res.status(400);
     }
 };
 
+const push = async (req, res) => {
+
+    try {
+        const commits = req.body.commits 
+        console.log(commits)
+    }
+    catch(err) {
+        console.log("Some error: ", err)
+    }
+}
 
 const issueAssigned = async (req, res) => {
     try {

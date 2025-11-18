@@ -57,7 +57,6 @@ export const routerFunction = (req, res) => {
             switch (req.body.action) {
                 case 'opened':
                     pullRequestOpened(req, res);
-                    console.log("hello form switch case");
                     break;
                 case 'edited':
                     pullRequestOpened(req, res);
@@ -243,6 +242,13 @@ const issueOpened = async (req, res) => {
                 currentPoints: currentPoints
             }
         });
+        console.log("Issue Created with : ", {
+                repoName: repoName,
+                title: title,
+                issueNumber: issueNumber,
+                openForAll: openForAll,
+                currentPoints: currentPoints
+            })
         return res.status(200).json();
     } catch (error) {
         console.error(error);

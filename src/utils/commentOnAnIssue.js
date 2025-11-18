@@ -28,7 +28,7 @@ export async function fetchCommentsFromGitHub( repoName, issueNumber) {
             {
                 headers: {
                     Accept: 'application/vnd.github+json',
-                    Authorization: `${process.env.GITHUB_TOKEN_BOT}`,
+                        Authorization: `Bearer ${process.env.GITHUB_TOKEN_BOT}`,
                 },
             }
         );

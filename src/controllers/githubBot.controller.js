@@ -20,7 +20,6 @@ export const routerFunction = (req, res) => {
             switch (req.body.action) {
                 case 'assigned':
                     issueAssigned(req, res);
-                    console.log("Hello from issue");
                     break;
                 case 'unassigned':
                     issueUnassigned(req, res);
@@ -56,7 +55,6 @@ export const routerFunction = (req, res) => {
             break;
         case 'pull_request':
             switch (req.body.action) {
-
                 case 'opened':
                     pullRequestOpened(req, res);
                     console.log("hello form switch case");
@@ -77,10 +75,10 @@ export const routerFunction = (req, res) => {
             }
             break;
 
-        case 'push' :
-            push(req, res)
-            console.log("SOMETHING PUSGED");
-            break;
+        // case 'push' :
+        //     push(req, res)
+        //     console.log("SOMETHING PUSGED");
+        //     break;
 
         default:
             return res.status(400);
@@ -350,6 +348,8 @@ const issueCommentCreated = async (req, res) => {
                     };
                 })
             );
+
+
             const tableHeader = '| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n';
             const tableRows = userIssueData
                 .flatMap(({ user, issues }) =>
@@ -358,6 +358,7 @@ const issueCommentCreated = async (req, res) => {
                 .join('\n');
 
             const responseComment = tableHeader + tableRows;
+
             await commentOnAnIssue( repoName, issueNumber, responseComment);
             return res.status(200).json();
         }
@@ -545,10 +546,11 @@ const pullRequestMerged = async (req, res) => {
             commentOnAPullRequest(
                 repoName,
                 PRNumber,
-                commentBuilder(TEMPLATE_NOT_FOLLOWED_ERROR)
+                commentBuilder(githubId, TEMPLATE_NOT_FOLLOWED_ERROR)
             );
             return res.status(200).json();
         }
+
         const issueData = await prisma.issue.findUnique({
             where: {
                 repoName_issueNumber: {

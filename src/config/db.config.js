@@ -7,6 +7,6 @@ export async function connDB() {
         await prisma.$connect();
         console.log(`Connected to Database`);
     } catch (error) {
-        
+        console.log("Error: ", error)
     }
 }

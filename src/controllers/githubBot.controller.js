@@ -304,6 +304,7 @@ const issueCommentCreated = async (req, res) => {
         const issueNumber = req.body.issue.number;
         const repoName = req.body.repository.name;
         const commentBody = req.body.comment.body;
+
         if (commentBody.startsWith('/assign')) {
             const assignee = req.body.issue.user.login; 
             console.log(assignee);
@@ -350,6 +351,7 @@ const issueCommentCreated = async (req, res) => {
                     };
                 })
             );
+
             const tableHeader = '| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n';
             const tableRows = userIssueData
                 .flatMap(({ user, issues }) =>
@@ -358,6 +360,8 @@ const issueCommentCreated = async (req, res) => {
                 .join('\n');
 
             const responseComment = tableHeader + tableRows;
+
+            // console.log(repoName, issueNumber, responseComment)
             await commentOnAnIssue( repoName, issueNumber, responseComment);
             return res.status(200).json();
         }

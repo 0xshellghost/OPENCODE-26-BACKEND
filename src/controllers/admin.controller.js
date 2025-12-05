@@ -137,6 +137,7 @@ const getEvents = async (req, res) => {
     try {
         const userId = req.user.id;
 
+        console.log("User ID in getEvents:", userId);
         const admin = await prisma.admin.findUnique({
             where: {
                 userId: userId
@@ -146,6 +147,8 @@ const getEvents = async (req, res) => {
             }
         });
         const events = admin.Event?.filter((event) => !event.deletedAt);
+
+        console.log(events)
 
         response_200(res, 'Events fetched successfully', events);
     } catch (error) {

@@ -9,7 +9,8 @@ export async function commentOnAnIssue( repoName, issueNumber, comment) {
             {
                 headers: {
                     Accept: 'application/vnd.github+json',
-                    Authorization: process.env.GITHUB_TOKEN_BOT,
+                    // Authorization: 'Bearer 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'
+                    Authorization: `Bearer ${process.env.GITHUB_TOKEN_BOT}`
                 },
             }
         );
@@ -28,7 +29,8 @@ export async function fetchCommentsFromGitHub( repoName, issueNumber) {
             {
                 headers: {
                     Accept: 'application/vnd.github+json',
-                    Authorization: `${process.env.GITHUB_TOKEN_BOT}`,
+                    // Authorization: 'Bearer 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'
+                    Authorization: `Bearer ${process.env.GITHUB_TOKEN_BOT}`,
                 },
             }
         );

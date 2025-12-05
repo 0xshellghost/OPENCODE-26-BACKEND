@@ -13,7 +13,7 @@ export async function commentOnAPullRequest(repoName, PRNumber, comment) {
                 }
             }
         );
-        console.log(response.status,response.data);
+        // console.log(response.status,response.data);
     } catch (error) {
         console.log(error);
     }

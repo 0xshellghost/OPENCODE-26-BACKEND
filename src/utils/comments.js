@@ -10,7 +10,7 @@ export var INVALID_ISSUE_NUMBER_ERROR = `Hey @githubId \n\nThis is not a valid I
 export var CLOSED_ISSUE_PR_ERROR = `Hey @githubId \n\nYou can't make a PR on closed issue. Try out our open issues in OpenCode\'25!`;
 export var PR_OPEN_SUCCESS = `Hey @githubId \n\nThanks for opening this PR 🚀. Mentor will review your pull request soon and till then, keep contributing and stay calm.\n\nThanks for contributing in OpenCode'25 ✨✨!`;
 export var NOT_ASSIGNED_TO_YOU_PR_ERROR = `Hey @githubId \n\nYou can't make a PR on an issue which is not open for all & assigned to someone else. Kindly check out some other issues or wait till it get assigned to you!. Happy contributing in OpenCode\'25 ✨✨!`;
-export var TEMPLATE_NOT_FOLLOWED_ERROR = `Hey @githubId \n\nPR Template is not followed. Kindly follow the template & edit it again for consideration as a valid pull request.\n\nThanks for contributing in OpenCode\'25 ✨✨!`;
+export var TEMPLATE_NOT_FOLLOWED_ERROR = `Hey @githubId \n\nPR Template is not followed. Kindly follow the template & edit it again for consideration as a valid pull request.\n\nThanks for contributing in OpenCode\'25 ✨✨! \n\n Correct Tempelate: \nIssue : #<Issue_Number>` ;
 export var MAX_ISSUE_LIMIT = `Hey @githubId \nYou already have 3 active issues assigned. Please resolve some before taking on more assignments.`;
 // PR_MERGED's comment is in githubBot.controller.js as it required two parameters and I wasn't in a mood to process it like above oves with a new function.
 

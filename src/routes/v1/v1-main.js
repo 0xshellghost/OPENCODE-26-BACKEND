@@ -21,6 +21,7 @@ router.use('/register', registerRouter);
 router.use('/admin', userAuth, isAdmin, adminRouter);
 
 router.post('/github-bot', signatureVerification, routerFunction);
+
 router.get('/', (req, res) => {
     response_200(res, 'V1 is live');
 });

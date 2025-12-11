@@ -19,7 +19,7 @@ const createEvent = async (req, res) => {
 
         // validation -> return immediately after sending response
         if (!title || !description || !logoImage) {
-            return response_400(
+            response_400(
                 res,
                 'Title, description are required to create an event'
             );
@@ -99,20 +99,30 @@ const createEvent = async (req, res) => {
                 }
             });
 
-            return response_201(res, 'Event created successfully', data);
+            response_201(res, 'Event created successfully', data);
         } else {
-            return response_403(res, 'Only admins can create events');
+            response_403(res, 'Only admins can create events');
         }
     } catch (error) {
-        return response_500(res, 'Error while creating event', error);
+        response_500(res, 'Error while creating event', error);
     }
 };
 
 const deleteEvent = async (req, res) => {
     try {
         const { eventName } = req.params;
+        const userId = req.user.id;
+        const admin = await prisma.admin.findUnique({
+            where: {
+                userId: userId //LHS = userId (numbers), RHS = userId (string (username))
+            }
+        });
+        if (!admin) {
+            console.log("Error form Here")
+            return response_403(res, 'Only admins can delete events');
+        }
         if (!eventName) {
-            response_400(res, 'Event id is required to delete an event');
+            return response_400(res, 'Event id is required to delete an event');
         }
 
         // delete event means just update deletedAt field in event table
@@ -127,9 +137,9 @@ const deleteEvent = async (req, res) => {
             }
         });
 
-        response_204(res, 'Event deleted successfully');
+        return response_204(res, 'Event deleted successfully');
     } catch (error) {
-        response_500(res, 'Error while deleting event', error);
+        return response_500(res, 'Error while deleting event', error);
     }
 };
 

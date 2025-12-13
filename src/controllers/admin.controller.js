@@ -15,24 +15,34 @@ import { getDataURI } from '../utils/dataURIparser.js';
 
 const createEvent = async (req, res) => {
     try {
-        const { title, description, startDate, endDate , logoImage, coverImages } = req.body;
+        // read form fields from body and uploaded files from multer (req.files)
+        const { title, description, startDate, endDate } = req.body;
+        const logoFiles = req.files?.logoImage || [];
+        const coverFiles = req.files?.coverImages || [];
 
         // validation -> return immediately after sending response
-        if (!title || !description || !logoImage) {
-            response_400(
+        if (!title || !description) {
+            return response_400(
                 res,
                 'Title, description are required to create an event'
             );
         }
+
+        // require logo file
+        if (!logoFiles.length) {
+            return response_400(res, 'Logo image is required to create an event');
+        }
+
         const userId = req.user.id;
         const admin = await prisma.admin.findUnique({
             where: {
                 userId: userId //LHS = userId (numbers), RHS = userId (string (username))
             }
         });
+        
+
         if (admin) {
-            const logoImageCloudinary = (await getDataURI(logoImage[0]))
-                .content;
+            const logoImageCloudinary = (await getDataURI(logoFiles[0])).content;
             const imageUpload = await cloudinary.uploader.upload(
                 logoImageCloudinary,
                 {
@@ -45,12 +55,11 @@ const createEvent = async (req, res) => {
                 }
             );
 
-            // guard coverImages to avoid calling .map on undefined
-            const coverImagesArray = Array.isArray(coverImages) ? coverImages : [];
+            // guard coverFiles to avoid calling .map on undefined
+            const coverImagesArray = Array.isArray(coverFiles) ? coverFiles : [];
             const coverImageLinks = await Promise.all(
-                coverImagesArray.map(async (coverImage, idx) => {
-                    const coverImageCloudinary = (await getDataURI(coverImage))
-                        .content;
+                coverImagesArray.map(async (coverFile, idx) => {
+                    const coverImageCloudinary = (await getDataURI(coverFile)).content;
                     const imageUpload = await cloudinary.uploader.upload(
                         coverImageCloudinary,
                         {
@@ -99,12 +108,12 @@ const createEvent = async (req, res) => {
                 }
             });
 
-            response_201(res, 'Event created successfully', data);
+            return response_201(res, 'Event created successfully', data);
         } else {
-            response_403(res, 'Only admins can create events');
+            return response_403(res, 'Only admins can create events');
         }
     } catch (error) {
-        response_500(res, 'Error while creating event', error);
+        return response_500(res, 'Error while creating event', error);
     }
 };
 

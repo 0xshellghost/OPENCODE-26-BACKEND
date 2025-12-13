@@ -74,7 +74,8 @@ const userTokenTransfer = async (req, res) => {
                         userGitHubData.avatar_url
                     )}`
                 );
-            } else {
+            } 
+            else {
                 if (userData.isAdmin) {
                     //check if user is admin
                     const checkAdmin = await prisma.admin.findUnique({

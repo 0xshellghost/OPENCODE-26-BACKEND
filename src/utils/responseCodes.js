@@ -57,7 +57,12 @@ export function response_404(res, message) {
 export function response_500(res, log_message, err) {
     var message = err != null ? `${log_message}: ${err}` : log_message;
 
-    console.debug(message);
+    console.debug('Debugging msg: ', message);
+
+    if (res && res.headersSent) {
+        console.error('Response headers already sent. Skipping additional 500 response.');
+        return;
+    }
 
     return res.status(500).json({
         status: 'error',

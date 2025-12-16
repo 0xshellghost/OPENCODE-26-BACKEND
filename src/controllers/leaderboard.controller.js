@@ -34,7 +34,7 @@ export const getLeaderboardProgress = async (req, res) => {
         });
       }
       map.get(pid).data.push({
-        date: dateToYMD(s.date),
+        date: s.date,
         points: s.totalPoints
       });
     }
@@ -53,8 +53,6 @@ export const getLeaderboardProgress = async (req, res) => {
 
     // remove helper key
     list = list.map(({ finalPoints, ...rest }) => rest);
-
-    
 
     return response_200(res, 'OK', list);
   } catch (error) {

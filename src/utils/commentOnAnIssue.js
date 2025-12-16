@@ -13,7 +13,6 @@ export async function commentOnAnIssue( repoName, issueNumber, comment) {
                 },
             }
         );
-        console.log('Comment posted successfully:', response.data);
         return response.data;
     } catch (error) {
         console.error('Error posting comment:', error.message);

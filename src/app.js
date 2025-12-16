@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import router from './routes/index.js';
 import { connDB } from './config/db.config.js';
+import { startLeaderboardSnapshotJob } from "./jobs/leaderboardSnapshot.job.js";
+
 
 dotenv.config();
 const app = express();
@@ -16,6 +18,10 @@ app.use('/api', router);
 const port = process.env.PORT || 4000;
 
 app.get('/', (req, res) => res.send('<h1>Welcome to Events Geekhaven API<h1>'));
+
+
+startLeaderboardSnapshotJob(); // 👈 START CRON HERE
+
 app.listen(port, () =>
     console.log(`🚀 Server running on port http://localhost:${port}/`)
 );

@@ -120,7 +120,7 @@ CREATE TABLE `Issue` (
 
 -- CreateTable
 CREATE TABLE `PR` (
-    `id` INTEGER NOT NULL,
+    `id` BIGINT NOT NULL,
     `title` VARCHAR(191) NOT NULL,
     `submitterId` VARCHAR(191) NOT NULL,
     `issueId` VARCHAR(191) NOT NULL,

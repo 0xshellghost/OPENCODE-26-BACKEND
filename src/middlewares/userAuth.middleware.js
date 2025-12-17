@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { response_401, response_500 } from '../utils/responseCodes.js';
 
 const userAuth = async (req, res, next) => {
+    
     //retrieve jwtToken value from client's request header
     const authHeader = req.headers['authorization'];
     if (authHeader === null || authHeader === undefined) {

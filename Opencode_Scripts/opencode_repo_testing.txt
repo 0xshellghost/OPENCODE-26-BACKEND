@@ -9,7 +9,7 @@ Testing will Be Done with everyone on ----> 19th Dec
 
 All of you will be added to this Mock Organization "OpenCode2025" ----> https://github.com/OpenCode2025
 
-All of you will member of this Org, Things you need to do as Maintainer in this Mock Org:
+All of you will be member of this Org, Things you need to do as Maintainer in this Mock Org:
 
 1) Create a repo with the same Name as you had finalized (Names are Case Sensitive in the DB, so please write the same as you had submitted in the Google Sheets)
 2) Set up the WebHook As shown in the Video and mentioned above

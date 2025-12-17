@@ -24,8 +24,9 @@ router.use('/leaderboard', leaderRouter)
 
 router.post('/github-bot', signatureVerification, routerFunction);
 
+
 router.get('/', (req, res) => {
-    response_200(res, 'V1 is live');
-});
+    res.send('<h1>V1 this iss...<h1>');
+})
 
 export default router;

@@ -11,7 +11,8 @@ import {
     PR_OPEN_SUCCESS,
     PR_OPENED_UNREGISTERED_ERROR,
     TEMPLATE_NOT_FOLLOWED_ERROR,
-    MAX_ISSUE_LIMIT
+    MAX_ISSUE_LIMIT,
+    FIRST_YEAR_ONLY_REPO
 } from '../utils/comments.js';
 import {commentOnAnIssue, fetchCommentsFromGitHub} from '../utils/commentOnAnIssue.js';
 export const routerFunction = (req, res) => {
@@ -47,7 +48,6 @@ export const routerFunction = (req, res) => {
             switch (req.body.action) {
                 case 'created':
                     issueCommentCreated(req, res);
-                    console.log("New comment created on issue or pull request");
                     break;
                 default:
                     return res.status(200).json();
@@ -295,6 +295,8 @@ const issueReopened = async (req, res) => {
                 status: IssueStatus.OPEN
             }
         });
+
+        console.log(`Issue : ${issueNumber} has been Reopened on Repo: ${repoName}`)
         return res.status(200).json();
     } catch (error) {
         console.error(error);
@@ -383,16 +385,38 @@ const pullRequestOpened = async (req, res) => {
         const repoName = req.body.repository.name;
         const { body, number: PRNumber, title, id } = req.body.pull_request;
         let issueNumber=0;
+        
+        const user = await prisma.user.findUnique({
+            where: {
+                githubId: githubId
+            }
+        })
+
+        const repo = await prisma.repo.findUnique({
+            where: {
+                name: repoName
+            }
+        })
+
+
+        if (repo.isFirstYrOnly && user.year != '1st Year'){
+            commentOnAPullRequest(
+                repoName,
+                PRNumber,
+                commentBuilder(githubId, FIRST_YEAR_ONLY_REPO)
+            )
+
+            return res.status(200).json();
+        }
+
+
         if(/Issue\s*:\s*#(\d+)/i.test(body)){
-            console.log("2");
             const match = body.match(/Issue\s*:\s*#(\d+)/i);
             issueNumber = match ? parseInt(match[1], 10) : null;
         }
         //const issueNumber = parseInt(body.match(/Issue\s*:\s*#(\d+)/i)?.[1],10);
         //console.log("issue num " + issueNumber);
         if (issueNumber!==0) {
-            console.log("4");
-
             const participant = await prisma.participant.findUnique({
                 where: {
                     participantId: githubId

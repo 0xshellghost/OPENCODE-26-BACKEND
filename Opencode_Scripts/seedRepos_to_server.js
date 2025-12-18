@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 // PUT YOUR VALUES HERE
 const creatorId = "23abdul23"; // Admin.userId → references User.githubId
-const eventName = "OPENCODE";   // Event.name must exist
+const eventName = "Opencode";   // Event.name must exist
 
 // List of repo names to insert
 const repoNames = [
@@ -26,12 +26,22 @@ const repoNames = [
   "GoGit",
   "Echo",
   "Loktantra",
-  "Tig"
+  "Ding"
 ];
+
+const FirstYrRepo = ['TechTonic']
 
 
 async function main() {
   console.log("📌 Seeding repos...");
+
+  // Delete all existing repos first
+  try {
+    const deleted = await prisma.repo.deleteMany();
+    console.log(`🗑️  Deleted ${deleted.count} existing repos`);
+  } catch (err) {
+    console.error('❌ Error deleting existing repos:', err);
+  }
 
   for (const repoName of repoNames) {
     try {
@@ -41,6 +51,28 @@ async function main() {
           creatorId: creatorId,
           eventName: eventName,
           description: "",
+        },
+      });
+
+      console.log(`✅ Inserted: ${repoName}`);
+    } catch (err) {
+      if (err.code === "P2002") {
+        console.log(`⚠ Skipped duplicate: ${repoName}`);
+      } else {
+        console.error(`❌ Error inserting ${repoName}:`, err);
+      }
+    }
+  }
+
+  for (const repoName of FirstYrRepo) {
+    try {
+      await prisma.repo.create({
+        data: {
+          name: repoName,
+          creatorId: creatorId,
+          eventName: eventName,
+          description: "",
+          isFirstYrOnly: true
         },
       });
 

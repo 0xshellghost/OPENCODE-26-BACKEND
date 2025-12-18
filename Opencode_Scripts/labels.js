@@ -36,8 +36,6 @@ const LABELS = [
   { name: "design", color: "e99695" }
 ];
 
-
-
 const ORG_NAME = "OpenCode2025";
 const TOKEN = process.env.GITHUB_TOKEN_BOT;
 
@@ -93,12 +91,35 @@ async function createLabel(repo, label) {
 }
 
 async function run() {
-  const repos = await getAllRepos();
+  // const repos = await getAllRepos();
+
+  //   const repos = [
+//   "SnapMap",
+//   "SpaceChat",
+//   "Cyber_lens",
+//   "Habitable-Planet-Hunter",
+//   "Subsentry",
+//   "CampusOR",
+//   "CC-Chronicles",
+//   "Blob",
+//   "Code-Craft",
+//   "Learn_To_Hack",
+//   "Fem-care",
+//   "CareerCraft",
+//   "Celestial_Vision",
+//   "Questline",
+//   "GoGit",
+//   "Echo",
+//   "Loktantra",
+//   "Tig"
+// ]
+  
+  const repos = ['SnapMap', 'Fem-Care', 'GoGit']
   console.log(`🔍 Found ${repos.length} repositories`);
 
   for (const repo of repos) {
     for (const label of LABELS) {
-      await createLabel(repo.name, label);
+      await createLabel(repo, label);
     }
   }
 

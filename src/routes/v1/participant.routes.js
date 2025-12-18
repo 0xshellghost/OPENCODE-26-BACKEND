@@ -10,7 +10,7 @@ import userAuth from '../../middlewares/userAuth.middleware.js';
 const participantRouter = express.Router();
 
 participantRouter.get('/',userAuth,loggedInParticipantDetails);
-participantRouter.get('/:participantId', getParticipant);
+participantRouter.get('/:participantId/:eventName', getParticipant);
 participantRouter.get(
     '/:participantId/:eventName/issues',
     participantIssues

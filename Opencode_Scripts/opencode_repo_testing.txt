@@ -1,8 +1,4 @@
-Webhook URL : https://liquidly-symmetrical-ethan.ngrok-free.dev/api/v1/github-bot
-
-In this URL 
-https://liquidly-symmetrical-ethan.ngrok-free.dev  ----> Once hosted this will change
-/api/v1/github-bot   ----> Will be Same
+Webhook URL : http://135.235.251.186/back/api/v1/github-bot
 
 
 Testing will Be Done with everyone on ----> 19th Dec

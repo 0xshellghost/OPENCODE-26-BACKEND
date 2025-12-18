@@ -6,9 +6,10 @@ import {
 } from '../utils/responseCodes.js';
 import { headerChecker } from '../utils/helpers.js';
 
+
 const getParticipant = async (req, res) => {
     try {
-        const { participantId } = req.params;
+        const { participantId, eventName } = req.params;
         const flag = await headerChecker(req);
         const participant = await prisma.participant.findUnique({
             where: {
@@ -46,11 +47,24 @@ const getParticipant = async (req, res) => {
 
             }
         });
-        // // gadekar sir special request
+
+        const leaderboard = await prisma.leaderboardEntry.findMany({
+            //Major WorkAround, in future if multiple events are hosted than it Needs To be
+            //used as 'participantId_eventName' as one participant can be in many Events
+            //by doing this it will fetch unique participants, currently only one event and one unique participant in that. 
+            where: {
+                participantId: participantId
+            },
+        })
+
+
         const formattedData = {
             ...participant.User,
-            PR: participant.PR
+            PR: participant.PR,
+            points: leaderboard[0].points,
+            prMerged: leaderboard[0].PRmerged,
         };
+
         return response_200(res, 'OK', formattedData);
     } catch (error) {
         response_500(res, 'Error', error);

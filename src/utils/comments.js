@@ -13,6 +13,7 @@ export var NOT_ASSIGNED_TO_YOU_PR_ERROR = `Hey @githubId \n\nYou can't make a PR
 export var TEMPLATE_NOT_FOLLOWED_ERROR = `Hey @githubId \n\nPR Template is not followed. Kindly follow the template & edit it again for consideration as a valid pull request.\n\nThanks for contributing in OpenCode\'25 ✨✨! \n\n Correct Tempelate: \nIssue : #<Issue_Number>` ;
 export var MAX_ISSUE_LIMIT = `Hey @githubId \nYou already have 3 active issues assigned. Please resolve some before taking on more assignments.`;
 export var FIRST_YEAR_ONLY_REPO = `Hey @githubId \nThis is a First Year Only Repo, You Can't Contirbute on this Repo.There are other amazing Repos wiating for you to contribute.\nHappy contributing in OpenCode\'25 ✨✨!`;
+export var GIRLS_ONLY_REPO = `Hey @githubId \nThis is a Girls Only Repo, You Can't Contirbute on this Repo.There are other amazing Repos wiating for you to contribute.\nHappy contributing in OpenCode\'25 ✨✨!`;
 // PR_MERGED's comment is in githubBot.controller.js as it required two parameters and I wasn't in a mood to process it like above oves with a new function.
 
 //GeekCamp

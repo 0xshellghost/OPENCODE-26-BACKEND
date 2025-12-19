@@ -1,4 +1,4 @@
-import { PRStatus } from '@prisma/client';
+// import { PRStatus } from '@prisma/client';
 import prisma from '../config/db.config.js';
 import { getRepoDetails } from '../utils/getRepoDetails.js';
 import {

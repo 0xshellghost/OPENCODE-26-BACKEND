@@ -22,7 +22,8 @@ const registerUser = async (req, res) => {
                 branch,
                 degree,
                 discordId,
-                avatarUrl
+                avatarUrl,
+                gender
             } = req.body;
 
             try {
@@ -38,6 +39,7 @@ const registerUser = async (req, res) => {
                                     college: college,
                                     graduationYear: Number(graduationYear),
                                     year: year,
+                                    gender: gender,
                                     branch: branch,
                                     degree: degree,
                                     discordId: discordId,

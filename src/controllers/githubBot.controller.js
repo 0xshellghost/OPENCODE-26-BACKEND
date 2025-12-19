@@ -1,4 +1,7 @@
-import { IssueStatus, PRStatus } from '@prisma/client';
+// import { IssueStatus, PRStatus } from '@prisma/client';
+import pkg from '@prisma/client';
+const { IssueStatus, PRStatus } = pkg;
+
 import prisma from '../config/db.config.js';
 import { commentOnAPullRequest } from '../utils/commentOnAPullRequest.js';
 import {
@@ -12,7 +15,8 @@ import {
     PR_OPENED_UNREGISTERED_ERROR,
     TEMPLATE_NOT_FOLLOWED_ERROR,
     MAX_ISSUE_LIMIT,
-    FIRST_YEAR_ONLY_REPO
+    FIRST_YEAR_ONLY_REPO,
+    GIRLS_ONLY_REPO
 } from '../utils/comments.js';
 import {commentOnAnIssue, fetchCommentsFromGitHub} from '../utils/commentOnAnIssue.js';
 export const routerFunction = (req, res) => {
@@ -408,6 +412,17 @@ const pullRequestOpened = async (req, res) => {
 
             return res.status(200).json();
         }
+
+        if (repo.isGirlsOnly && user.gender != 'female'){
+            commentOnAPullRequest(
+                repoName,
+                PRNumber,
+                commentBuilder(githubId, GIRLS_ONLY_REPO)
+            )
+
+            return res.status(200).json();
+        }
+
 
 
         if(/Issue\s*:\s*#(\d+)/i.test(body)){

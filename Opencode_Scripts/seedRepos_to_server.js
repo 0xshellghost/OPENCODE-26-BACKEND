@@ -19,7 +19,6 @@ const repoNames = [
   "Blob",
   "Code-Craft",
   "Learn_To_Hack",
-  "Fem-care",
   "CareerCraft",
   "Celestial_Vision",
   "Questline",
@@ -36,7 +35,7 @@ const repoNames = [
 ];
 
 const FirstYrRepo = ['TechTonic']
-
+const GirlsOnlyRepo = ["Fem-care"]
 
 async function main() {
   console.log("📌 Seeding repos...");
@@ -79,6 +78,28 @@ async function main() {
           eventName: eventName,
           description: "",
           isFirstYrOnly: true
+        },
+      });
+
+      console.log(`✅ Inserted: ${repoName}`);
+    } catch (err) {
+      if (err.code === "P2002") {
+        console.log(`⚠ Skipped duplicate: ${repoName}`);
+      } else {
+        console.error(`❌ Error inserting ${repoName}:`, err);
+      }
+    }
+  }
+
+  for (const repoName of GirlsOnlyRepo) {
+    try {
+      await prisma.repo.create({
+        data: {
+          name: repoName,
+          creatorId: creatorId,
+          eventName: eventName,
+          description: "",
+          isGirlsOnly: true
         },
       });
 

@@ -8,163 +8,137 @@ datasource db {
   relationMode = "prisma"
 }
 
-model User {
-  id             String       @id @default(uuid())
-  isAdmin        Boolean      @default(false)
-  name           String       @db.VarChar(255)
-  email          String       @unique
-  avatarUrl      String
-  college        String
-  graduationYear Int
-  branch         String
-  degree         String
-  discordId      String?      @unique
-  githubId       String       @unique
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  deletedAt      DateTime?
-  year           String       @db.VarChar(20)
-  Admin          Admin?
-  Participant    Participant?
-
-  @@index([githubId])
+model admin {
+  id     String @id
+  userId String @unique(map: "Admin_userId_key")
 }
 
-model Admin {
-  id     String  @id @default(uuid())
-  userId String  @unique
-  user   User    @relation(fields: [userId], references: [githubId])
-  Event  Event[]
-  Repo   Repo[]
-}
-
-model Participant {
-  id                   String                @id @default(uuid())
-  participantId        String                @unique
-  User                 User                  @relation(fields: [participantId], references: [githubId])
-  PR                   PR[]
-  Issue                Issue[]
-  LeaderboardEntries   LeaderboardEntry[]
-  LeaderboardSnapshots LeaderboardSnapshot[]
-}
-
-model Event {
-  id                   String                @id @default(cuid())
-  creatorId            String
-  name                 String                @unique
-  description          String?
-  startDate            DateTime              @default(now())
-  endDate              DateTime?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  deletedAt            DateTime?
-  logoImageURL         String?
-  creator              Admin                 @relation(fields: [creatorId], references: [userId])
-  Repo                 Repo[]
-  LeaderBoardEntries   LeaderboardEntry[]
-  LeaderboardSnapshots LeaderboardSnapshot[]
-  coverImagesURL       coverImageURL[]
-
-  @@index([creatorId])
-}
-
-model coverImageURL {
+model coverimageurl {
   id        Int    @id @default(autoincrement())
-  url       String @unique
+  url       String @unique(map: "coverImageURL_url_key")
   eventName String
-  event     Event  @relation(fields: [eventName], references: [name])
 
-  @@index([eventName])
+  @@index([eventName], map: "coverImageURL_eventName_idx")
 }
 
-model LeaderboardEntry {
-  id            String      @id @default(uuid())
-  participantId String
-  eventName     String
-  points        Int         @default(0)
-  PRmerged      Int         @default(0)
-  Participant   Participant @relation(fields: [participantId], references: [participantId])
-  event         Event       @relation(fields: [eventName], references: [name])
+model event {
+  id           String    @id
+  creatorId    String
+  name         String    @unique(map: "Event_name_key")
+  description  String?
+  startDate    DateTime  @default(now())
+  endDate      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime
+  deletedAt    DateTime?
+  logoImageURL String?
 
-  @@unique([participantId, eventName])
-  @@index([eventName])
+  @@index([creatorId], map: "Event_creatorId_idx")
 }
 
-model Repo {
-  id            String    @id @default(uuid())
-  creatorId     String
-  eventName     String
-  name          String    @unique
-  description   String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
-  isFirstYrOnly Boolean   @default(false)
-  creator       Admin     @relation(fields: [creatorId], references: [userId])
-  event         Event     @relation(fields: [eventName], references: [name])
-  issues        Issue[]
-
-  @@index([creatorId])
-  @@index([eventName])
-}
-
-model Issue {
-  id            String       @id @default(uuid())
+model issue {
+  id            String       @id
   repoName      String
   assigneeId    String?
   issueNumber   Int
   title         String
-  status        IssueStatus  @default(OPEN)
+  status        issue_status @default(OPEN)
   openForAll    Boolean      @default(false)
   currentPoints Int          @default(0)
   createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  updatedAt     DateTime
   deletedAt     DateTime?
-  repo          Repo         @relation(fields: [repoName], references: [name])
-  PR            PR[]
-  assignee      Participant? @relation(fields: [assigneeId], references: [participantId])
 
-  @@unique([repoName, issueNumber])
-  @@index([assigneeId])
+  @@unique([repoName, issueNumber], map: "Issue_repoName_issueNumber_key")
+  @@index([assigneeId], map: "Issue_assigneeId_idx")
 }
 
-model PR {
-  id          BigInt      @id
+model leaderboardentry {
+  id            String @id
+  participantId String
+  eventName     String
+  points        Int    @default(0)
+  PRmerged      Int    @default(0)
+
+  @@unique([participantId, eventName], map: "LeaderboardEntry_participantId_eventName_key")
+  @@index([eventName], map: "LeaderboardEntry_eventName_idx")
+}
+
+model leaderboardsnapshot {
+  id            String   @id
+  participantId String
+  eventName     String
+  date          DateTime
+  totalPoints   Int      @default(0)
+  PRmerged      Int      @default(0)
+
+  @@unique([participantId, eventName, date], map: "LeaderboardSnapshot_participantId_eventName_date_key")
+  @@index([eventName, date], map: "LeaderboardSnapshot_eventName_date_idx")
+  @@index([participantId, date], map: "LeaderboardSnapshot_participantId_date_idx")
+}
+
+model participant {
+  id            String @id
+  participantId String @unique(map: "Participant_participantId_key")
+}
+
+model pr {
+  id          BigInt    @id
   title       String
   submitterId String
   issueId     String
   prNumber    Int
   points      Int
-  status      PRStatus    @default(OPENED)
-  submitter   Participant @relation(fields: [submitterId], references: [participantId])
-  issue       Issue       @relation(fields: [issueId], references: [id])
+  status      pr_status @default(OPENED)
 
-  @@index([submitterId])
-  @@index([issueId])
+  @@index([issueId], map: "PR_issueId_idx")
+  @@index([submitterId], map: "PR_submitterId_idx")
 }
 
-model LeaderboardSnapshot {
-  id            String      @id @default(uuid())
-  participantId String
+model repo {
+  id            String    @id
+  creatorId     String
   eventName     String
-  date          DateTime
-  totalPoints   Int         @default(0)
-  PRmerged      Int         @default(0)
-  participant   Participant @relation(fields: [participantId], references: [participantId])
-  event         Event       @relation(fields: [eventName], references: [name])
+  name          String    @unique(map: "Repo_name_key")
+  description   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
+  deletedAt     DateTime?
+  isFirstYrOnly Boolean   @default(false)
+  isGirlsOnly   Boolean   @default(false)
 
-  @@unique([participantId, eventName, date])
-  @@index([eventName, date])
-  @@index([participantId, date])
+  @@index([creatorId], map: "Repo_creatorId_idx")
+  @@index([eventName], map: "Repo_eventName_idx")
 }
 
-enum IssueStatus {
+model user {
+  id             String    @id
+  isAdmin        Boolean   @default(false)
+  name           String    @db.VarChar(255)
+  email          String    @unique(map: "User_email_key")
+  avatarUrl      String
+  college        String
+  graduationYear Int
+  branch         String
+  degree         String
+  discordId      String?   @unique(map: "User_discordId_key")
+  githubId       String    @unique(map: "User_githubId_key")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime
+  deletedAt      DateTime?
+  year           String    @db.VarChar(20)
+  gender         String    @default("male") @db.VarChar(20)
+
+  @@index([githubId], map: "User_githubId_idx")
+}
+
+enum issue_status {
   OPEN
   CLOSED
   ASSIGNED
 }
 
-enum PRStatus {
+enum pr_status {
   MERGED
   OPENED
   REJECTED

@@ -31,7 +31,8 @@ const repoNames = [
   "UXplained",
   "AppCosmos",
   "DhamaalEffeKa",
-  "MotionKit"
+  "MotionKit",
+  "Huddle-Backend"
 ];
 
 const FirstYrRepo = ['TechTonic']

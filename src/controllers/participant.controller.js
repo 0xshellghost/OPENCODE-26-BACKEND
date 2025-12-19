@@ -20,6 +20,7 @@ const getParticipant = async (req, res) => {
                     select: {
                         name: true,
                         githubId: true,
+                        gender: true,
                         avatarUrl: true,
                         ...(flag && {
                             email: true,

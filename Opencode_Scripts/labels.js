@@ -93,7 +93,7 @@ async function createLabel(repo, label) {
 async function run() {
   // const repos = await getAllRepos();
 
-  //   const repos = [
+//     const repos = [
 //   "SnapMap",
 //   "SpaceChat",
 //   "Cyber_lens",
@@ -111,10 +111,16 @@ async function run() {
 //   "GoGit",
 //   "Echo",
 //   "Loktantra",
-//   "Tig"
-// ]
+//   "DING",
+//   "Tightspace",
+//   "EventChain",
+//   "UXplained",
+//   "AppCosmos",
+//   "DhamaalEffeKa",
+//   "MotionKit"
+// ];
   
-  const repos = ['SnapMap', 'Fem-Care', 'GoGit']
+  const repos = ['Echo']
   console.log(`🔍 Found ${repos.length} repositories`);
 
   for (const repo of repos) {

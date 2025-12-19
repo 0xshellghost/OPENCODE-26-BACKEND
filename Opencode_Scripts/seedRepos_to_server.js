@@ -26,7 +26,13 @@ const repoNames = [
   "GoGit",
   "Echo",
   "Loktantra",
-  "Ding"
+  "DING",
+  "Tightspace",
+  "EventChain",
+  "UXplained",
+  "AppCosmos",
+  "DhamaalEffeKa",
+  "MotionKit"
 ];
 
 const FirstYrRepo = ['TechTonic']

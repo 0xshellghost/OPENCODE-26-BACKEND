@@ -36,12 +36,12 @@ async function main() {
   console.log("📌 Seeding repos...");
 
   // Delete all existing repos first
-  try {
-    const deleted = await prisma.repo.deleteMany();
-    console.log(`🗑️  Deleted ${deleted.count} existing repos`);
-  } catch (err) {
-    console.error('❌ Error deleting existing repos:', err);
-  }
+  // try {
+  //   const deleted = await prisma.repo.deleteMany();
+  //   console.log(`🗑️  Deleted ${deleted.count} existing repos`);
+  // } catch (err) {
+  //   console.error('❌ Error deleting existing repos:', err);
+  // }
 
   for (const repoName of repoNames) {
     try {

@@ -10,26 +10,111 @@ export const getLeaderboardProgress = async (req, res) => {
     const { eventName } = req.query;
     if (!eventName) return response_500(res, 'Missing eventName');
 
-    const currentUserId = req.user?.id || null;
+    const currentUserGithubId = req.user?.id || null;
 
     const snapshots = await prisma.leaderboardSnapshot.findMany({
       where: { eventName },
       include: {
         participant: {
           include: {
-            User: { select: { name: true, avatarUrl: true, githubId: true } }
+            User: {
+              select: {
+                name: true,
+                avatarUrl: true,
+                githubId: true
+              }
+            }
           }
         }
       },
       orderBy: { date: 'asc' }
     });
 
+    // Group snapshots by participant
     const map = new Map();
 
     for (const s of snapshots) {
-      const pid = s.participant?.User?.githubId;
-      if (!pid) continue;
+      const pid = s.participantId;
 
+      if (!map.has(pid)) {
+        map.set(pid, {
+          participantId: pid,
+          githubId: s.participant?.User?.githubId ?? null,
+          name: s.participant?.User?.name ?? pid,
+          avatarUrl: s.participant?.User?.avatarUrl ?? null,
+          data: []
+        });
+      }
+
+      const entry = map.get(pid);
+      const last = entry.data.at(-1);
+
+      if (!last || last.points !== s.totalPoints) {
+        entry.data.push({
+          date: s.date,
+          points: s.totalPoints
+        });
+      }
+    }
+
+    let list = Array.from(map.values());
+
+    // Compute final points
+    list = list.map((p) => ({
+      ...p,
+      finalPoints: p.data.length
+        ? p.data[p.data.length - 1].points
+        : 0
+    }));
+
+    // Sort by score
+    list.sort((a, b) => b.finalPoints - a.finalPoints);
+
+    const TOP_N = 5;
+    let topList = list.slice(0, TOP_N);
+
+    if(currentUserGithubId && !topList.some(p => p.participantId === currentUserGithubId)){
+      const currentUserData = list.find(p => p.participantId === currentUserGithubId);
+      if(currentUserData){
+        topList.push(currentUserData);
+      }
+    }
+
+    // Remove helper keys
+    topList = topList.map(({ finalPoints, githubId, ...rest }) => rest);
+
+    return response_200(res, 'OK', topList);
+  } catch (error) {
+    console.error(error);
+    return response_500(res, 'Error', error);
+  }
+};
+
+
+
+/*
+export const getLeaderboardProgress = async (req, res) => {
+  try {
+    const { eventName } = req.query;
+    if (!eventName) return response_500(res, 'Missing eventName');
+
+    const currentUserId = req.user?.id || null; // Comes from userAuth middleware
+
+    // Fetch all leaderboard snapshots for the event
+    const snapshots = await prisma.leaderboardSnapshot.findMany({
+      where: { eventName },
+      include: {
+        participant: {
+          include: { User: { select: { name: true, avatarUrl: true, githubId: true } } }
+        }
+      },
+      orderBy: { date: 'asc' }
+    });
+
+    // Group snapshots by participant
+    const map = new Map();
+    for (const s of snapshots) {
+      const pid = s.participantId;
       if (!map.has(pid)) {
         map.set(pid, {
           participantId: pid,
@@ -38,69 +123,65 @@ export const getLeaderboardProgress = async (req, res) => {
           data: []
         });
       }
-      map.get(pid).data.push({
-        date: s.date,
-        points: s.totalPoints
-      });
-    }
-
-    let list = Array.from(map.values()).map(p => ({
-      ...p,
-      finalPoints: p.data.at(-1)?.points ?? 0
-    }));
-
-    list.sort((a, b) => b.finalPoints - a.finalPoints);
-
-    const TOP_N = 5;
-    list = list.slice(0, TOP_N);
-
-    if (currentUserId && !list.some(p => p.participantId === currentUserId)) {
-      const currentUserSnapshots = await prisma.leaderboardSnapshot.findMany({
-        where: {
-          eventName,
-          participantId: currentUserId
-        },
-        include: {
-          participant: {
-            include: {
-              User: {
-                select: {
-                  name: true,
-                  avatarUrl: true,
-                  githubId: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: { date: 'asc' }
-      });
-
-      if (currentUserSnapshots.length) {
-        const userData = currentUserSnapshots[0].participant?.User;
-
-        list.push({
-          participantId: currentUserId,
-          name: userData?.name ?? currentUserId,
-          avatarUrl: userData?.avatarUrl ?? null,
-          data: currentUserSnapshots.map(s => ({
-            date: s.date,
-            points: s.totalPoints
-          })),
-          finalPoints: currentUserSnapshots.at(-1)?.totalPoints ?? 0
+      // Only push if score changes (step-wise)
+      const last = map.get(pid).data.slice(-1)[0];
+      if (!last || last.points !== s.totalPoints) {
+        map.get(pid).data.push({
+          date: s.date,
+          points: s.totalPoints
         });
       }
     }
 
-    list = list.map(({ finalPoints, ...rest }) => rest);
+    let list = Array.from(map.values());
 
-    return response_200(res, 'OK', list);
+    // Compute final points for sorting
+    list = list.map((p) => ({
+      ...p,
+      finalPoints: p.data.length ? p.data[p.data.length - 1].points : 0
+    }));
+
+    // Sort descending by points
+    list.sort((a, b) => b.finalPoints - a.finalPoints);
+
+    const TOP_N = 5;
+    let topList = list.slice(0, TOP_N);
+
+    // Include current user if not already in top
+    if (currentUserId && !topList.some((p) => p.participantId === currentUserId)) {
+      // Try to find current user's snapshots
+      const currentUserData = list.find((p) => p.participantId === currentUserId);
+      if (currentUserData) {
+        topList.push(currentUserData);
+      } else {
+        // fallback: fetch current user info from DB
+        const userDb = await prisma.user.findUnique({
+          where: { githubId: currentUserId },
+          select: { name: true, avatarUrl: true }
+        });
+        topList.push({
+          participantId: currentUserId,
+          //name: userDb?.name ?? currentUserId,
+          name:"hello",
+          avatarUrl: userDb?.avatarUrl ?? null,
+          data: [],
+          finalPoints: 0
+        });
+      }
+    }
+
+    // Remove helper key before sending
+    topList = topList.map(({ finalPoints, ...rest }) => rest);
+
+    console.log(topList)
+
+    return response_200(res, 'OK', topList);
   } catch (error) {
     console.error(error);
     return response_500(res, 'Error', error);
   }
 };
-
+*/
 
 /*
 

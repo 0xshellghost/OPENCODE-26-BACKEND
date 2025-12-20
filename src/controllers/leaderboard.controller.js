@@ -1,8 +1,108 @@
 // controllers/leaderboard.controller.js
 import prisma from '../config/db.config.js';
 import { response_200, response_500 } from '../utils/responseCodes.js';
+import { headerChecker } from '../utils/helpers.js';
 
 const dateToYMD = (d) => d.toISOString().slice(0, 10);
+
+export const getLeaderboardProgress = async (req, res) => {
+  try {
+    const { eventName } = req.query;
+    if (!eventName) return response_500(res, 'Missing eventName');
+
+    const currentUserId = req.user?.id || null;
+
+    const snapshots = await prisma.leaderboardSnapshot.findMany({
+      where: { eventName },
+      include: {
+        participant: {
+          include: {
+            User: { select: { name: true, avatarUrl: true, githubId: true } }
+          }
+        }
+      },
+      orderBy: { date: 'asc' }
+    });
+
+    const map = new Map();
+
+    for (const s of snapshots) {
+      const pid = s.participant?.User?.githubId;
+      if (!pid) continue;
+
+      if (!map.has(pid)) {
+        map.set(pid, {
+          participantId: pid,
+          name: s.participant?.User?.name ?? pid,
+          avatarUrl: s.participant?.User?.avatarUrl ?? null,
+          data: []
+        });
+      }
+      map.get(pid).data.push({
+        date: s.date,
+        points: s.totalPoints
+      });
+    }
+
+    let list = Array.from(map.values()).map(p => ({
+      ...p,
+      finalPoints: p.data.at(-1)?.points ?? 0
+    }));
+
+    list.sort((a, b) => b.finalPoints - a.finalPoints);
+
+    const TOP_N = 5;
+    list = list.slice(0, TOP_N);
+
+    if (currentUserId && !list.some(p => p.participantId === currentUserId)) {
+      const currentUserSnapshots = await prisma.leaderboardSnapshot.findMany({
+        where: {
+          eventName,
+          participantId: currentUserId
+        },
+        include: {
+          participant: {
+            include: {
+              User: {
+                select: {
+                  name: true,
+                  avatarUrl: true,
+                  githubId: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: { date: 'asc' }
+      });
+
+      if (currentUserSnapshots.length) {
+        const userData = currentUserSnapshots[0].participant?.User;
+
+        list.push({
+          participantId: currentUserId,
+          name: userData?.name ?? currentUserId,
+          avatarUrl: userData?.avatarUrl ?? null,
+          data: currentUserSnapshots.map(s => ({
+            date: s.date,
+            points: s.totalPoints
+          })),
+          finalPoints: currentUserSnapshots.at(-1)?.totalPoints ?? 0
+        });
+      }
+    }
+
+    list = list.map(({ finalPoints, ...rest }) => rest);
+
+    return response_200(res, 'OK', list);
+  } catch (error) {
+    console.error(error);
+    return response_500(res, 'Error', error);
+  }
+};
+
+
+/*
 
 // GET /api/leaderboard/progress?eventName=...&topN=10
 export const getLeaderboardProgress = async (req, res) => {
@@ -59,6 +159,8 @@ export const getLeaderboardProgress = async (req, res) => {
     return response_500(res, 'Error', error);
   }
 };
+
+*/
 
 // GET /api/leaderboard/progress/:participantId?eventName=...
 export const getParticipantProgress = async (req, res) => {

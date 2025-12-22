@@ -655,6 +655,19 @@ const pullRequestMerged = async (req, res) => {
                 }
             }
         });
+
+
+        await prisma.leaderboardEvent.create({
+            data: {
+                participantId: githubId,
+                eventName: eventName,
+                type: 'PR_MERGED',
+                pointsDelta: currentPoints,
+                prId: BigInt(id),
+                issueId: issueData.id
+            }
+        });
+        
         // OpenCode
         const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing in OpenCode\'25✨✨`;
         // GeekCamp

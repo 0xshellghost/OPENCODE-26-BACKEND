@@ -4,6 +4,7 @@ import cors from 'cors';
 import router from './routes/index.js';
 import { connDB } from './config/db.config.js';
 import { startLeaderboardSnapshotJob } from "./jobs/leaderboardSnapshot.job.js";
+import { startBackupCron } from './jobs/backupCron.job.js';
 
 
 dotenv.config();
@@ -19,8 +20,9 @@ const port = process.env.PORT || 4000;
 
 app.get('/', (req, res) => res.send('<h1>Welcome to Events Geekhaven API<h1>'));
 
-
-startLeaderboardSnapshotJob(); // 👈 START CRON HERE
+//BACKUP CRON JOB
+startBackupCron();
+startLeaderboardSnapshotJob(); 
 
 app.listen(port, "0.0.0.0", () =>
   console.log(`🚀 Server running on ${process.env.BACKEND_URL || `http://0.0.0.0:${port}`}`)

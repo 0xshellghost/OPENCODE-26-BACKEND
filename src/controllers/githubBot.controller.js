@@ -371,7 +371,8 @@ const issueCommentCreated = async (req, res) => {
 
             const responseComment = tableHeader + tableRows;
 
-            // console.log(repoName, issueNumber, responseComment)
+            console.log(repoName, issueNumber, responseComment)
+            
             await commentOnAnIssue( repoName, issueNumber, responseComment);
             return res.status(200).json();
         }

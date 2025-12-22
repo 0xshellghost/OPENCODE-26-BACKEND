@@ -10,6 +10,7 @@ const eventName = "Opencode";   // Event.name must exist
 // List of repo names to insert
 const repoNames = [
   "SnapMap",
+  "test_hook",
   "SpaceChat",
   "Cyber_lens",
   "Habitable-Planet-Hunter",
@@ -19,6 +20,7 @@ const repoNames = [
   "Blob",
   "Code-Craft",
   "Learn_To_Hack",
+  // "Fem-care",
   "CareerCraft",
   "Celestial_Vision",
   "Questline",
@@ -26,13 +28,14 @@ const repoNames = [
   "Echo",
   "Loktantra",
   "DING",
-  "Tightspace",
+  "PixDash",
   "EventChain",
   "UXplained",
   "AppCosmos",
   "DhamaalEffeKa",
   "MotionKit",
-  "Huddle-Backend"
+  "Huddle-Backend",
+  "Nommetric",
 ];
 
 const FirstYrRepo = ['TechTonic']

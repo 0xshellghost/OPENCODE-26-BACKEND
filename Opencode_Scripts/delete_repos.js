@@ -4,7 +4,7 @@ import fetch from "node-fetch";
 dotenv.config();
 
 const GITHUB_TOKEN_BOT = process.env.GITHUB_TOKEN_BOT;
-const ORG = "OpenCode2025";
+const ORG = "opencodeiiita";
 
 const repos = ["CC-Chronicles", "TechTonic"];
 

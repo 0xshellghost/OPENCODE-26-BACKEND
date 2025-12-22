@@ -49,6 +49,7 @@ const registerUser = async (req, res) => {
                         }
                     }
                 });
+                console.log('New user created:', newParticipant);
                 response_200(res, 'User created successfully', newParticipant);
             } catch (error) {
                 console.log(error);

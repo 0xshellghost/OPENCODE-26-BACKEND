@@ -120,7 +120,7 @@ async function run() {
 //   "MotionKit"
 // ];
   
-  const repos = ['Fem-care']
+  const repos = ['test_hook']
   console.log(`🔍 Found ${repos.length} repositories`);
 
   for (const repo of repos) {

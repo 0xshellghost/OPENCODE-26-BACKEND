@@ -22,7 +22,6 @@ export async function commentOnAnIssue( repoName, issueNumber, comment) {
 
 export async function fetchCommentsFromGitHub( repoName, issueNumber) {
     try {
-        console.log(`https://api.github.com/repos/${process.env.ORG_NAME}/${repoName}/issues/${issueNumber}/comments`)
         const response = await axios.get(
             `https://api.github.com/repos/${process.env.ORG_NAME}/${repoName}/issues/${issueNumber}/comments`,
             {

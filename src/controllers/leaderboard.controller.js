@@ -31,9 +31,16 @@ export const getLeaderboardProgress = async (req, res) => {
       orderBy: { createdAt: 'asc' }
     });
 
+    console.log(`Fetched ${events.length} leaderboard events for event "${eventName}"`);
+    
+    if (!events.length) return response_200(res, 'OK', []);
+
     // 2️⃣ Group by participant & build cumulative timeline
     const map = new Map();
     for (const e of events) {
+      // Skip orphaned rows (no participant relation)
+      if (!e.participant || !e.participantId) continue;
+      
       const pid = e.participantId;
 
       if (!map.has(pid)) {

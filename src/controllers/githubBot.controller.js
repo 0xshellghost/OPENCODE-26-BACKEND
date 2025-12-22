@@ -51,7 +51,9 @@ export const routerFunction = (req, res) => {
         case 'issue_comment':
             switch (req.body.action) {
                 case 'created':
+
                     issueCommentCreated(req, res);
+                    
                     break;
                 default:
                     return res.status(200).json();
@@ -184,6 +186,13 @@ const issueLabeled = async (req, res) => {
                 }
             });
         }
+
+        console.log("Issue Relabeled with : ", {
+                repoName: repoName,
+                issueNumber: issueNumber,
+                openForAll: openForAll,
+                currentPoints: currentPoints
+            })
     } catch (error) {
         console.error(error);
         return res.status(200).json();
@@ -370,10 +379,11 @@ const issueCommentCreated = async (req, res) => {
                 .join('\n');
 
             const responseComment = tableHeader + tableRows;
-
-            console.log(repoName, issueNumber, responseComment)
+            
+            // console.log(repoName, issueNumber, responseComment)
             
             await commentOnAnIssue( repoName, issueNumber, responseComment);
+            console.log('Comment Created on: ', repoName, " Issue: ", issueNumber)
             return res.status(200).json();
         }
         return res.status(200).json();
@@ -656,7 +666,8 @@ const pullRequestMerged = async (req, res) => {
                 }
             }
         });
-
+        
+        console.log("Done LeaderboardEntry")
 
         await prisma.leaderboardEvent.create({
             data: {
@@ -668,6 +679,8 @@ const pullRequestMerged = async (req, res) => {
                 issueId: issueData.id
             }
         });
+
+        console.log("Done LeaderboardEvent")
         
         // OpenCode
         const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing in OpenCode\'25✨✨`;

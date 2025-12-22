@@ -10,157 +10,91 @@ export const getLeaderboardProgress = async (req, res) => {
     const { eventName } = req.query;
     if (!eventName) return response_500(res, 'Missing eventName');
 
-    const currentUserId = req.user?.id || null;
+    const currentUserGithubId = req.user?.id || null;
 
-    const snapshots = await prisma.leaderboardSnapshot.findMany({
+    // 1️⃣ Fetch all leaderboard events for the event
+    const events = await prisma.leaderboardEvent.findMany({
       where: { eventName },
       include: {
         participant: {
           include: {
-            User: { select: { name: true, avatarUrl: true, githubId: true } }
+            User: {
+              select: {
+                name: true,
+                avatarUrl: true,
+                githubId: true
+              }
+            }
           }
         }
       },
-      orderBy: { date: 'asc' }
+      orderBy: { createdAt: 'asc' }
     });
 
+    // 2️⃣ Group by participant & build cumulative timeline
     const map = new Map();
-
-    for (const s of snapshots) {
-      const pid = s.participant?.User?.githubId;
-      if (!pid) continue;
+    for (const e of events) {
+      const pid = e.participantId;
 
       if (!map.has(pid)) {
         map.set(pid, {
           participantId: pid,
-          name: s.participant?.User?.name ?? pid,
-          avatarUrl: s.participant?.User?.avatarUrl ?? null,
-          data: []
+          githubId: e.participant?.User?.githubId ?? null,
+          name: e.participant?.User?.name ?? pid,
+          avatarUrl: e.participant?.User?.avatarUrl ?? null,
+          data: [],
+          _total: 0 // internal accumulator
         });
       }
-      map.get(pid).data.push({
-        date: s.date,
-        points: s.totalPoints
+
+      const entry = map.get(pid);
+
+      entry._total += e.pointsDelta;
+
+      entry.data.push({
+        date: e.createdAt,
+        points: entry._total
       });
     }
 
-    let list = Array.from(map.values()).map(p => ({
+    // 3️⃣ Convert map → array
+    let list = Array.from(map.values());
+
+    // 4️⃣ Compute final points
+    list = list.map(({ _total, ...p }) => ({
       ...p,
-      finalPoints: p.data.at(-1)?.points ?? 0
+      finalPoints: _total
     }));
 
+    // 5️⃣ Sort by final score
     list.sort((a, b) => b.finalPoints - a.finalPoints);
 
     const TOP_N = 5;
-    list = list.slice(0, TOP_N);
+    let topList = list.slice(0, TOP_N);
 
-    if (currentUserId && !list.some(p => p.participantId === currentUserId)) {
-      const currentUserSnapshots = await prisma.leaderboardSnapshot.findMany({
-        where: {
-          eventName,
-          participantId: currentUserId
-        },
-        include: {
-          participant: {
-            include: {
-              User: {
-                select: {
-                  name: true,
-                  avatarUrl: true,
-                  githubId: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: { date: 'asc' }
-      });
-
-      if (currentUserSnapshots.length) {
-        const userData = currentUserSnapshots[0].participant?.User;
-
-        list.push({
-          participantId: currentUserId,
-          name: userData?.name ?? currentUserId,
-          avatarUrl: userData?.avatarUrl ?? null,
-          data: currentUserSnapshots.map(s => ({
-            date: s.date,
-            points: s.totalPoints
-          })),
-          finalPoints: currentUserSnapshots.at(-1)?.totalPoints ?? 0
-        });
+    // 6️⃣ Ensure current user is included
+    if (
+      currentUserGithubId &&
+      !topList.some(p => p.participantId === currentUserGithubId)
+    ) {
+      const currentUserData = list.find(
+        p => p.participantId === currentUserGithubId
+      );
+      if (currentUserData) {
+        topList.push(currentUserData);
       }
     }
 
-    list = list.map(({ finalPoints, ...rest }) => rest);
+    // 7️⃣ Remove helper fields
+    topList = topList.map(({ finalPoints, githubId, ...rest }) => rest);
 
-    return response_200(res, 'OK', list);
+    return response_200(res, 'OK', topList);
   } catch (error) {
     console.error(error);
     return response_500(res, 'Error', error);
   }
 };
 
-
-/*
-
-// GET /api/leaderboard/progress?eventName=...&topN=10
-export const getLeaderboardProgress = async (req, res) => {
-  try {
-    const { eventName } = req.query;
-    if (!eventName) return response_500(res, 'Missing eventName');
-
-    const snapshots = await prisma.leaderboardSnapshot.findMany({
-      where: { eventName },
-      include: {
-        participant: {
-          include: { User: { select: { name: true, avatarUrl: true, githubId: true } } }
-        }
-      },
-      orderBy: { date: 'asc' }
-    });
-
-    const topN = 7;
-    // Group into participant => [snapshots...]
-    const map = new Map();
-    for (const s of snapshots) {
-      const pid = s.participantId;
-      if (!map.has(pid)) {
-        map.set(pid, {
-          participantId: pid,
-          name: s.participant?.User?.name ?? pid,
-          avatarUrl: s.participant?.User?.avatarUrl ?? null,
-          data: []
-        });
-      }
-      map.get(pid).data.push({
-        date: s.date,
-        points: s.totalPoints
-      });
-    }
-
-    let list = Array.from(map.values());
-
-    // compute final points and sort desc
-    list = list.map((p) => ({
-      ...p,
-      finalPoints: p.data.length ? p.data[p.data.length - 1].points : 0
-    }));
-    list.sort((a, b) => b.finalPoints - a.finalPoints);
-
-    const n = parseInt(topN || '0', 10);
-    if (n > 0) list = list.slice(0, n);
-
-    // remove helper key
-    list = list.map(({ finalPoints, ...rest }) => rest);
-
-    return response_200(res, 'OK', list);
-  } catch (error) {
-    return response_500(res, 'Error', error);
-  }
-};
-
-*/
 
 // GET /api/leaderboard/progress/:participantId?eventName=...
 export const getParticipantProgress = async (req, res) => {

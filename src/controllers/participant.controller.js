@@ -39,7 +39,8 @@ const getParticipant = async (req, res) => {
                             issue: {
                                 select: {
                                     issueNumber: true,
-                                    currentPoints: true
+                                    currentPoints: true,
+                                    repoName: true
                                 }
                             }
                         }

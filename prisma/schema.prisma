@@ -17,7 +17,6 @@ model User {
   college        String
   graduationYear Int
   branch         String
-  gender         String       @default("male") @db.VarChar(20)
   degree         String
   discordId      String?      @unique
   githubId       String       @unique
@@ -25,6 +24,7 @@ model User {
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
   year           String       @db.VarChar(20)
+  gender         String       @default("male") @db.VarChar(20)
   Admin          Admin?
   Participant    Participant?
 

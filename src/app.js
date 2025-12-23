@@ -22,7 +22,7 @@ app.get('/', (req, res) => res.send('<h1>Welcome to Events Geekhaven API<h1>'));
 
 //BACKUP CRON JOB
 startBackupCron();
-startLeaderboardSnapshotJob(); 
+// startLeaderboardSnapshotJob(); 
 
 app.listen(port, "0.0.0.0", () =>
   console.log(`🚀 Server running on ${process.env.BACKEND_URL || `http://0.0.0.0:${port}`}`)

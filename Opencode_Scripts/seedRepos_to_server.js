@@ -10,17 +10,16 @@ const eventName = "Opencode";   // Event.name must exist
 // List of repo names to insert
 const repoNames = [
   "SnapMap",
-  "test_hook",
   "SpaceChat",
   "Cyber_lens",
-  "Habitable-Planet-Hunter",
+  "habitable-planet-hunter",
   "Subsentry",
   "CampusOR",
   "CC-Chronicles",
   "Blob",
   "Code-Craft",
   "Learn_To_Hack",
-  // "Fem-care",
+  "Fem-care",
   "CareerCraft",
   "Celestial_Vision",
   "Questline",
@@ -32,25 +31,19 @@ const repoNames = [
   "EventChain",
   "UXplained",
   "AppCosmos",
-  "DhamaalEffeKa",
+  "Ba-Effe",
   "MotionKit",
-  "Huddle-Backend",
-  "Nommetric",
+  "Alum-X-Frontend",
+  "Alum-X-Backend",
+  "Nommetric"
 ];
+
 
 const FirstYrRepo = ['TechTonic']
 const GirlsOnlyRepo = ["Fem-care"]
 
 async function main() {
   console.log("📌 Seeding repos...");
-
-  // Delete all existing repos first
-  // try {
-  //   const deleted = await prisma.repo.deleteMany();
-  //   console.log(`🗑️  Deleted ${deleted.count} existing repos`);
-  // } catch (err) {
-  //   console.error('❌ Error deleting existing repos:', err);
-  // }
 
   for (const repoName of repoNames) {
     try {

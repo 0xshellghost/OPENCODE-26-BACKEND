@@ -21,6 +21,7 @@ const getParticipant = async (req, res) => {
                         name: true,
                         githubId: true,
                         gender: true,
+                        year: true,
                         avatarUrl: true,
                         ...(flag && {
                             email: true,
@@ -238,7 +239,9 @@ const loggedInParticipantDetails = async (req, res) => {
                         college: true,
                         avatarUrl: true,
                         githubId: true,
-                        discordId: true
+                        discordId: true,
+                        gender: true,
+                        year: true
                     }
                 },
                 LeaderboardEntries: {

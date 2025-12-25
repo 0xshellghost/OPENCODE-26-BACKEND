@@ -11,10 +11,7 @@ const participantRouter = express.Router();
 
 participantRouter.get('/',userAuth,loggedInParticipantDetails);
 participantRouter.get('/:participantId/:eventName', getParticipant);
-participantRouter.get(
-    '/:participantId/:eventName/issues',
-    participantIssues
-); //repo id as query param
+participantRouter.get('/:participantId/:eventName/issues', participantIssues); //repo id as query param
 participantRouter.get('/:githubId/:eventName/pr', getPRdetails);
 
 export default participantRouter;

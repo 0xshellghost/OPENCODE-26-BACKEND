@@ -522,7 +522,7 @@ const pullRequestOpened = async (req, res) => {
                         commentBuilder(githubId, NOT_ASSIGNED_PR_ERROR)
                     );
                 } else {
-                    console.log('yha');
+                    
                     await prisma.pR.create({
                         data: {
                             id: id,
@@ -538,6 +538,7 @@ const pullRequestOpened = async (req, res) => {
                         PRNumber,
                         commentBuilder(githubId, PR_OPEN_SUCCESS)
                     );
+                    console.log('PR Created on Repo: ', repoName, ' PR Number: ', PRNumber);
                 }
             }
         } else {
@@ -667,7 +668,6 @@ const pullRequestMerged = async (req, res) => {
             }
         });
         
-        console.log("Done LeaderboardEntry")
 
         await prisma.leaderboardEvent.create({
             data: {
@@ -680,14 +680,14 @@ const pullRequestMerged = async (req, res) => {
             }
         });
 
-        console.log("Done LeaderboardEvent")
         
         // OpenCode
         const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing in OpenCode\'25✨✨`;
         // GeekCamp
         //const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for participating in GeekCamp ✨✨`;
         commentOnAPullRequest(repoName, PRNumber, PR_MERGED);
-
+        console.log('PR Merged on Repo: ', repoName, ' PR: ', PRNumber);
+                
         return res.status(200).json();
     } catch (error) {
         console.error(error);

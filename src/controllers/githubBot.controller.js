@@ -317,74 +317,143 @@ const issueReopened = async (req, res) => {
     }
 };
 
-
 const issueCommentCreated = async (req, res) => {
     try {
         const issueNumber = req.body.issue.number;
         const repoName = req.body.repository.name;
         const commentBody = req.body.comment.body;
-
-        if (commentBody.startsWith('/assign')) {
-            const assignee = req.body.issue.user.login; 
-            console.log(assignee);
-            
-            if (!assignee) {
-                return res.status(400).json({ error: 'No assignee specified in the command.' });
-            }
-
-            const activeIssues = await prisma.issue.findMany({
-                where: {
-                    assigneeId: assignee,
-                    status: 'ASSIGNED', 
-                },
-            });
-
-            if (activeIssues.length >= 3) {
-                await commentOnAnIssue(repoName, issueNumber, commentBuilder(assignee, MAX_ISSUE_LIMIT));
-                return res.status(200).json();
-            }
+        
+        if (!commentBody.startsWith('/info') && !commentBody.startsWith('/shazam')) {
             return res.status(200).json();
         }
+        
+        const comments = await fetchCommentsFromGitHub(repoName, issueNumber);
+        const uniqueUsers = [...new Set(comments.map(comment => comment.user.login))];
 
-        if (commentBody.startsWith('/info')) {
-            const comments = await fetchCommentsFromGitHub( repoName, issueNumber);
-            const uniqueUsers = [...new Set(comments.map(comment => comment.user.login))];
+        if (commentBody.startsWith('/shazam')) {
             const userIssueData = await Promise.all(
                 uniqueUsers.map(async (user) => {
+                    const userRecord = await prisma.user.findUnique({
+                        where: { githubId: user },
+                        select: { isAdmin: true },
+                    });
+        
+                    if (!userRecord) {
+                        return {
+                            user,
+                            issues: [{
+                                repoName: 'N/A',
+                                issueDetails: 'N/A',
+                                status: 'N/A',
+                            }],
+                        };
+                    }
+        
+                    if (userRecord.isAdmin) {
+                        return null;
+                    }
                     const issues = await prisma.issue.findMany({
                         where: { assigneeId: user },
                         select: {
+                            issueNumber: true,
                             title: true,
                             repoName: true,
-                            status: true
-                        }
+                            status: true,
+                        },
                     });
-
+        
+                    if (issues.length > 0) {
+                        return {
+                            user,
+                            issues: issues.map(issue => ({
+                                repoName: `[${issue.repoName}](https://github.com/${process.env.ORG_NAME}/${issue.repoName})`, 
+                                issueDetails: `${issue.issueNumber} - ${issue.title}`,
+                                status: issue.status, 
+                            })),
+                        };
+                    }
                     return {
                         user,
-                        issues: issues.map(issue => ({
-                            title: issue.title,
-                            repoName: issue.repoName,
-                            status: issue.status
-                        }))
+                        issues: [{
+                            repoName: '0',
+                            issueDetails: '0',
+                            status: '-',
+                        }],
                     };
                 })
             );
-
-            const tableHeader = '| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n';
+        
+            const tableHeader = '| User | Repo | Issue Details | Status |\n|------|------|---------------|--------|\n';
             const tableRows = userIssueData
+                .filter(data => data !== null)
                 .flatMap(({ user, issues }) =>
-                    issues.map(issue => `| ${user} | ${issue.repoName} | ${issue.title} | ${issue.status} |`)
+                    issues.map(issue => 
+                        `| ${user} | ${issue.repoName} | ${issue.issueDetails} | ${issue.status} |`
+                    )
                 )
                 .join('\n');
-
+        
             const responseComment = tableHeader + tableRows;
-            
-            // console.log(repoName, issueNumber, responseComment)
-            
             await commentOnAnIssue( repoName, issueNumber, responseComment);
-            console.log('Comment Created on: ', repoName, " Issue: ", issueNumber)
-            return res.status(200).json();
+        }
+                              
+        else if (commentBody.startsWith('/info')) {
+            const userRepoData = await Promise.all(
+                uniqueUsers.map(async (user) => {
+                    const userRecord = await prisma.user.findUnique({
+                        where: { githubId: user },
+                        select: { isAdmin: true },
+                    });
+        
+                    if (!userRecord) {
+                        return {
+                            user,
+                            repoInfo: 'N/A',
+                        };
+                    }
+                    if (userRecord.isAdmin) {
+                        return null;
+                    }
+                    const activeIssues = await prisma.issue.findMany({
+                        where: {
+                            assigneeId: user,
+                            status: 'ASSIGNED',
+                        },
+                        select: {
+                            repoName: true,
+                        },
+                    });
+        
+                    if (activeIssues.length > 0) {
+                        const repoCounts = activeIssues.reduce((acc, issue) => {
+                            acc[issue.repoName] = (acc[issue.repoName] || 0) + 1;
+                            return acc;
+                        }, {});
+        
+                        const repoInfo = Object.entries(repoCounts)
+                            .map(([repo, count]) => `${repo} (${count})`)
+                            .join(', ');
+                        return {
+                            user,
+                            repoInfo,
+                        };
+                    }
+                    return {
+                        user,
+                        repoInfo: '0',
+                    };
+                })
+            );
+            
+            
+            const tableHeader = '| User | Repo |\n|------|-----------|\n';
+            const tableRows = userRepoData
+                .filter((data) => data !== null)
+                .map(({ user, repoInfo }) => `| ${user} | ${repoInfo} |`)
+                .join('\n');
+        
+            const responseComment = tableHeader + tableRows;
+            await commentOnAnIssue( repoName, issueNumber, responseComment);
         }
         return res.status(200).json();
     } catch (error) {
@@ -392,6 +461,83 @@ const issueCommentCreated = async (req, res) => {
         return res.status(500).json({ error: 'Internal Server Error' });
     }
 };
+
+//Current PROD 
+// const issueCommentCreated = async (req, res) => {
+//     try {
+//         const issueNumber = req.body.issue.number;
+//         const repoName = req.body.repository.name;
+//         const commentBody = req.body.comment.body;
+
+//         if (commentBody.startsWith('/assign')) {
+//             const assignee = req.body.issue.user.login; 
+//             console.log(assignee);
+            
+//             if (!assignee) {
+//                 return res.status(400).json({ error: 'No assignee specified in the command.' });
+//             }
+
+//             const activeIssues = await prisma.issue.findMany({
+//                 where: {
+//                     assigneeId: assignee,
+//                     status: 'ASSIGNED', 
+//                 },
+//             });
+
+//             if (activeIssues.length >= 3) {
+//                 await commentOnAnIssue(repoName, issueNumber, commentBuilder(assignee, MAX_ISSUE_LIMIT));
+//                 return res.status(200).json();
+//             }
+//             return res.status(200).json();
+//         }
+        
+//         const comments = await fetchCommentsFromGitHub( repoName, issueNumber);
+//         const uniqueUsers = [...new Set(comments.map(comment => comment.user.login))];
+        
+//         if (commentBody.startsWith('/info')) {
+//             const userIssueData = await Promise.all(
+//                 uniqueUsers.map(async (user) => {
+//                     const issues = await prisma.issue.findMany({
+//                         where: { assigneeId: user },
+//                         select: {
+//                             title: true,
+//                             repoName: true,
+//                             status: true
+//                         }
+//                     });
+
+//                     return {
+//                         user,
+//                         issues: issues.map(issue => ({
+//                             title: issue.title,
+//                             repoName: issue.repoName,
+//                             status: issue.status
+//                         }))
+//                     };
+//                 })
+//             );
+
+//             const tableHeader = '| User | Repo | Issue Title | Status |\n|------|------|-------------|--------|\n';
+//             const tableRows = userIssueData
+//                 .flatMap(({ user, issues }) =>
+//                     issues.map(issue => `| ${user} | ${issue.repoName} | ${issue.title} | ${issue.status} |`)
+//                 )
+//                 .join('\n');
+
+//             const responseComment = tableHeader + tableRows;
+            
+//             // console.log(repoName, issueNumber, responseComment)
+            
+//             await commentOnAnIssue( repoName, issueNumber, responseComment);
+//             console.log('Comment Created on: ', repoName, " Issue: ", issueNumber)
+//             return res.status(200).json();
+//         }
+//         return res.status(200).json();
+//     } catch (error) {
+//         console.error('Error in issueCommentCreated:', error.message);
+//         return res.status(500).json({ error: 'Internal Server Error' });
+//     }
+// };
 
 
 const pullRequestOpened = async (req, res) => {

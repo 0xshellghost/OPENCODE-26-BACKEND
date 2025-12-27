@@ -10,6 +10,7 @@ import { routerFunction } from '../../controllers/githubBot.controller.js';
 import { isAdmin } from '../../middlewares/isAdmin.middleware.js';
 import userAuth from '../../middlewares/userAuth.middleware.js';
 import signatureVerification from '../../middlewares/webhookValidate.middleware.js';
+import { getDetail } from '../../controllers/detail.controller.js';
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.use('/admin', userAuth, isAdmin, adminRouter);
 router.use('/leaderboard', leaderRouter)
 
 router.post('/github-bot', signatureVerification, routerFunction);
-
+router.get('/detail/:type/:id', getDetail);
 
 router.get('/', (req, res) => {
     res.send('<h1>V1 this iss...<h1>');

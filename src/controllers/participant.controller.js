@@ -32,6 +32,7 @@ const getParticipant = async (req, res) => {
                 },
                 PR: {
                     take: flag ? 5 : 0,
+                    orderBy: { id: 'desc' },
                     ...(flag && {
                         select: {
                             prNumber: true,

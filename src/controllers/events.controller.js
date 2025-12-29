@@ -128,25 +128,23 @@ const getLeaderboard = async (req, res) => {
                     }
                 }
             },
-            orderBy: {
-                points: 'desc'
-            }
+            orderBy: [
+                { points: 'desc' },
+                { PRmerged: 'desc' },
+                { participantId: 'asc' }
+            ]
         });
 
-        // Algorithm to get rank for each participant
-        let prevPosition = 0;
+        // Deterministic ordering + dense ranking for stable ties
+        let lastPoints = null;
+        let rankCounter = 0;
         const formattedLeaderboard = leaderboardOfEvent.map((entry) => {
-            let position = prevPosition + 1;
-            if (
-                prevPosition > 0 &&
-                entry.points === leaderboardOfEvent[prevPosition - 1].points
-            ) {
-                position = prevPosition;
-            } else {
-                prevPosition = position;
+            if (lastPoints === null || entry.points !== lastPoints) {
+                rankCounter += 1;
+                lastPoints = entry.points;
             }
             return {
-                position: position,
+                position: rankCounter,
                 name: entry.Participant.User.name,
                 githubid: entry.Participant.User.githubId,
                 prmerged: entry.PRmerged,

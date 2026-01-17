@@ -570,15 +570,15 @@ const pullRequestOpened = async (req, res) => {
             return res.status(200).json();
         }
 
-        if (repo.isGirlsOnly && user.gender != 'female'){
-            commentOnAPullRequest(
-                repoName,
-                PRNumber,
-                commentBuilder(githubId, GIRLS_ONLY_REPO)
-            )
+        // if (repo.isGirlsOnly && user.gender != 'female'){
+        //     commentOnAPullRequest(
+        //         repoName,
+        //         PRNumber,
+        //         commentBuilder(githubId, GIRLS_ONLY_REPO)
+        //     )
 
-            return res.status(200).json();
-        }
+        //     return res.status(200).json();
+        // }
 
 
 

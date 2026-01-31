@@ -1,125 +1,170 @@
-### Setup procedure
-1. Install nvm
-```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
-```
-2. Get node version 20.5.1
+# Geekhaven Events Backend
+
+## Overview
+Node/Express API for Geekhaven events. Uses Prisma + MySQL/MariaDB, GitHub OAuth, and optional GitHub webhooks.
+
+Base URL (local): `http://localhost:4000`  
+API prefix: `/api/v1`
+
+## Requirements
+- Node.js 20.5.1 (recommended via nvm)
+- MySQL or MariaDB
+
+## Setup
+1) Install Node 20.5.1
 ```bash
 nvm install 20.5.1
 nvm use 20.5.1
 ```
-3. To install the packages
+
+2) Install dependencies
 ```bash
 npm ci
 ```
-4. To run the app in dev mode
-```bash
-npm run dev
-```
-5. To migrate the database
+
+3) Configure environment variables
+- Copy `.env.example` to `.env`
+- Fill in all required values (see **Environment Variables** below)
+
+4) Run database migrations
 ```bash
 npm run migrate
 ```
 
-Install mysql or mariadb
-
-Configure the database for this URL in .env for 
-DATABASE_URL and SHADOW_DATABASE_URL
+5) Start the server
 ```bash
-mysql://<user>:<password>@localhost:3306/aidnitra" 
+npm run dev
 ```
 
-To check the connected database, run
+## Database
+Set these in `.env` (example shown):
+```
+DATABASE_URL=mysql://<user>:<password>@localhost:3306/aidnitra
+SHADOW_DATABASE_URL=mysql://<user>:<password>@localhost:3306/aidnitra_shadow
+```
+
+To inspect the DB:
 ```bash
 npx prisma studio
 ```
 
-### .env Setup
-Fill the Variables mentioned in the .env.example
+## GitHub OAuth Setup
+1) Create a GitHub OAuth App:
+- Homepage URL: `http://localhost:3000`
+- Authorization callback URL: `http://localhost:4000/api/v1/auth/github/callback`
 
-Go to Github -> Settings -> Developer Settings -> OAuth Apps -> Generate your own Client ID and Secret
+2) Put the Client ID/Secret into `.env`.
 
-Under the same OAuth Settings, update the 
+## Webhooks (optional)
+- Configure a GitHub webhook to point to:
+  `POST /api/v1/github-bot`
+- Use the same `WEBHOOK_SECRET` in GitHub and `.env`.
 
-Homepage Url : http://localhost:3000
+## Environment Variables
+From `.env.example`:
+- `CLIENT_ID`, `CLIENT_SECRET` (GitHub OAuth)
+- `JWT_SECRET`
+- `DATABASE_URL`, `SHADOW_DATABASE_URL`
+- `PORT`, `BACKEND_URL`
+- `ORG_NAME`
+- `SUCCESS_REDIRECT_URL`, `USER_DASHBOARD_URL`, `ADMIN_DASHBOARD_URL`
+- `WEBHOOK_SECRET`, `GITHUB_TOKEN_BOT`
+- `CLOUD_NAME`, `CLOUD_API_KEY`, `CLOUD_API_SECRET`
 
-Authorization callback URL : http://localhost:4000/api/v1/auth/github/callback
+## Project Structure (high level)
+```
+backend/
+  Opencode_Scripts        Useful Scripts to Setup the DB and Testing
+  prisma/                 Prisma schema + migrations
+  src/
+    app.js                Express app bootstrap
+    config/               DB config
+    controllers/          Route handlers
+    middlewares/          Auth, admin, webhook validation
+    jobs/                 Cron jobs (backup, leaderboard snapshot)
+    routes/               API routes (v1)
+    utils/                Shared helpers
+```
 
-For testing make your Own Github Acc as admin directly thorugh the interactive  Prisma Studio.
-Make temp Github Acc for simple user testing.
+## API Endpoints (v1)
+All routes below are under `/api/v1`.
 
-If facing any issues, try deleting the modules and package-lock.json
+### Auth
+- `GET /auth/github` : Start GitHub OAuth
+- `GET /auth/github/callback` : OAuth callback, issues JWT
+
+### Participant / Profile
+- `GET /participant/` : Logged-in participant details (requires auth)
+- `GET /participant/:participantId/:eventName` : Participant profile by GitHub ID + event
+- `GET /participant/:participantId/:eventName/issues?repoName=...` : Participant issues for event (repo filtered)
+- `GET /participant/:githubId/:eventName/pr` : Participant PR details (admin view)
+
+### Events
+- `GET /events/` : List all events
+- `POST /events/register?eventName=...` : Register logged-in user for an event (requires auth)
+- `GET /events/:eventName` : Event details
+- `GET /events/:eventName/repos` : All repos for an event
+- `GET /events/:eventName/repos/:repoName` : Single repo details
+- `POST /events/:eventName/repos/add` : Add repo to event (requires auth + admin)
+- `GET /events/:eventName/leaderboard` : Event leaderboard
+
+### Register
+- `POST /register` : Create participant profile (requires auth)
+
+### Admin (all require auth + admin)
+- `POST /admin/create` : Create event (multipart form data)
+- `DELETE /admin/delete/:eventName` : Delete event
+- `GET /admin/events` : List created events
+- `POST /admin/event/:eventName/repos/add` : Add repo to event
+- `GET /admin/event/:eventName/repos` : List repos for an event
+- `POST /admin/:userId/addAdmin` : Grant admin role
+- `PATCH /admin/modify` : Increment PR points
+- `GET /admin/:eventName/:participantId/issues?repoName=...` : Participant issues (admin view)
+
+### Leaderboard
+- `GET /leaderboard/health` : Health check
+- `GET /leaderboard/progress?eventName=...` : Progress graph data (requires auth)
+- `GET /leaderboard/progress/:participantId?eventName=...` : Participant progress
+
+### Misc
+- `POST /github-bot` : GitHub webhook receiver (signature required)
+- `GET /detail/:type/:id` : Utility detail lookup
+- `GET /` : API welcome message
+- `GET /api/v1` : Version root
+
+## Opencode Scripts (backend/Opencode_Scripts)
+Utility scripts for one-off maintenance and seeding. Most are destructive or org-wide.
+Run from `backend/` after `npm ci` and with a correct `.env`.
+
+General usage:
+```bash
+cd backend
+node Opencode_Scripts/<script>.js
+```
+
+Scripts:
+- `add_users_to_org.js` : Invite a fixed list of GitHub users to an org. Edit `ORG_NAME` and `githubUsers`.
+- `cleanup.js` : Destructive DB cleanup; preserves a single GitHub ID. Update `KEEP_GITHUB_ID`.
+- `delete_repos.js` : Delete a list of repos from an org. Edit `ORG` and `repos`.
+- `labels.js` : Create standard issue labels across org repos. Edit `ORG_NAME` and repo list.
+- `make_db_copy.sh` : Dumps MySQL DB to `../OPENCODE_testing.sql`. Update `CURRENT_DB`.
+- `orphan.js` : Detects orphaned leaderboard entries/participants; prints cleanup hints.
+- `reset_admin.js` : Clears admin activity for a specific GitHub ID. Update `ADMIN_GITHUB_ID`.
+- `seed.js` : Seeds DB with synthetic event/users/repos/issues/PRs/leaderboard data.
+- `seedRepos_to_server.js` : Inserts repo rows for an event. Update `creatorId`, `eventName`, `repoNames`.
+- `test.js` : Sanity check for `leaderboardEvent` table counts.
+- `webhook.js` : Remove all webhooks from org repos. Set `DRY_RUN` to preview.
+
+Notes:
+- These scripts use env vars like `GITHUB_TOKEN_BOT`, `ORG_NAME`, and DB connection values.
+- Review each script before running; several perform deletes.
+
+## Troubleshooting
+If dependencies are corrupted:
 ```bash
 rm -rf node_modules package-lock.json
 npm install
 ```
 
-### File Structure
-
-```
-.
-├──.env
-├── package.json
-├── package-lock.json
-├── prisma
-│   ├── migrations
-│   │   ├── 20230920161325_open_code_portal
-│   │   │   └── migration.sql
-│   │   └── migration_lock.toml
-│   └── schema.prisma
-├── README.md
-└── src
-    ├── app.js
-    ├── config
-    │   └── db.js
-    ├── controllers
-    │   └── userAuth.controller.js
-    ├── middlewares
-    │   └── userAuth.middleware.js
-    ├── models
-    │   └── userModel.js
-    ├── public
-    │   └── public.js
-    ├── routes
-    │   ├── index.js
-    │   └── v1
-    │       ├── authRoutes.js
-    │       └── v1-main.js
-    └── utils
-        ├── index.js
-        └── responseCodes.js
-
-
-12 directories, 17 files
-
-```
-
-- under the routes folder, multiple different folders can exist depending on which version is currently deployed, and which are being worked on. each version (say v1) has its own folder, and inside that folder are the routes used for that particular version of the app.
-
-- all these routes are routed in the v1-main.js inside the v1 folder. this v1-main.js file can then directly be used in the src/app.js file (the main App file).
-
-- this is beneficial as changing from one version to another requires minimal effort: just change the version being imported in the src/routes/index.js, and create separate routes in a new version folder v'x', having a file v'x'-main.js for routing all routes in that version.
-
-- below routes are demonstrated assuming that v1 is the currently deployed version.
-
-
-### Endpoints
-
-## Auth: 
-- server running on http://localhost:4000/
-
-1) /api/v1 - redirects the user to the home page of v1.
-2) /api/v1/auth/github - redirects the user to the GitHub Auth page.
-3) /api/v1/auth/github/callback - invoked when the user grants access to the app.
-
-- this invokation creates a JWT token and stores it in the cookies. this can then be used to authenticate the user across multiple different pages of our site without them having to login through GitHub.
-
-- returning just the user's github data obtained by making a call to the GitHub API for now. this can be handled on another route, where the relevant information is showed depending on the user's actions on the redirected page.
-
-
-
-## Configuration for future years:
-    1:Github token using a new(fake) account(any)
-    2:Webhooks(at GeekHaven->settings->hooks->new)- Issues, comments, pull requests
-    3:Added secret while creating webhook
-    4:Took a url from webhook.site(for testing purposes only)
+# Advice (from terror_quota)
+This is where only FOSS will work, All endpoints work correctly But some need to be improve and integrated properly from frontend. Improvements are written in [2026.md](2026.md). These needs to be done and further improvements are upon you.

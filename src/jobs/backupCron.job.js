@@ -8,6 +8,7 @@ const BACKUP_SCRIPT = path.resolve('/var/www/server/db_backups/backup_db.sh');
 export function startBackupCron() {
   // Runs every day at 2:00 AM
   cron.schedule('0 2 * * *', () => {
+  // cron.schedule('* * * * *', () => {
     console.log('[CRON] Starting DB backup...');
 
     exec(`bash ${BACKUP_SCRIPT}`, (error, stdout, stderr) => {

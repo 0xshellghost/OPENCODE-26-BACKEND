@@ -12,7 +12,7 @@ export const getLeaderboardProgress = async (req, res) => {
 
     const currentUserGithubId = req.user?.id || null;
 
-    // 1️⃣ Fetch all leaderboard events for the event
+    // Fetch all leaderboard events for the event
     const events = await prisma.leaderboardEvent.findMany({
       where: { eventName },
       include: {
@@ -35,7 +35,7 @@ export const getLeaderboardProgress = async (req, res) => {
     
     if (!events.length) return response_200(res, 'OK', []);
 
-    // 2️⃣ Group by participant & build cumulative timeline
+    // Group by participant & build cumulative timeline
     const map = new Map();
     for (const e of events) {
       // Skip orphaned rows (no participant relation)
@@ -64,22 +64,21 @@ export const getLeaderboardProgress = async (req, res) => {
       });
     }
 
-    // 3️⃣ Convert map → array
+    // Convert map → array
     let list = Array.from(map.values());
 
-    // 4️⃣ Compute final points
+    //Compute final points
     list = list.map(({ _total, ...p }) => ({
       ...p,
       finalPoints: _total
     }));
 
-    // 5️⃣ Sort by final score
+    //Sort by final score
     list.sort((a, b) => b.finalPoints - a.finalPoints);
 
     const TOP_N = 5;
     let topList = list.slice(0, TOP_N);
 
-    // 6️⃣ Ensure current user is included
     if (
       currentUserGithubId &&
       !topList.some(p => p.participantId === currentUserGithubId)
@@ -92,7 +91,6 @@ export const getLeaderboardProgress = async (req, res) => {
       }
     }
 
-    // 7️⃣ Remove helper fields
     topList = topList.map(({ finalPoints, githubId, ...rest }) => rest);
 
     return response_200(res, 'OK', topList);
@@ -110,22 +108,47 @@ export const getParticipantProgress = async (req, res) => {
     const { eventName } = req.query;
     if (!participantId || !eventName) return response_500(res, 'Missing params');
 
-    const snapshots = await prisma.leaderboardSnapshot.findMany({
+    // Fetch all leaderboard events for this participant & event, ordered by creation time
+    const events = await prisma.leaderboardEvent.findMany({
       where: { participantId, eventName },
-      include: { participant: { include: { User: { select: { name: true, avatarUrl: true } } } } },
-      orderBy: { date: 'asc' }
+      include: {
+        participant: {
+          include: { User: { select: { name: true, avatarUrl: true, githubId: true } } }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
     });
 
-    const data = snapshots.map((s) => ({
-      date: dateToYMD(s.date),
-      points: s.totalPoints
-    }));
+    // If no events found, return an empty data timeline
+    if (!events.length) {
+      const emptyMeta = {
+        participantId,
+        githubId: null,
+        name: participantId,
+        avatarUrl: null,
+        data: [],
+        finalPoints: 0
+      };
+      return response_200(res, 'OK', emptyMeta);
+    }
+
+    // Build cumulative timeline from pointsDelta
+    let total = 0;
+    const data = events.map((e) => {
+      total += e.pointsDelta || 0;
+      return {
+        date: e.createdAt,
+        points: total
+      };
+    });
 
     const meta = {
       participantId,
-      name: snapshots[0]?.participant?.User?.name ?? participantId,
-      avatarUrl: snapshots[0]?.participant?.User?.avatarUrl ?? null,
-      data
+      githubId: events[0]?.participant?.User?.githubId ?? null,
+      name: events[0]?.participant?.User?.name ?? participantId,
+      avatarUrl: events[0]?.participant?.User?.avatarUrl ?? null,
+      data,
+      finalPoints: total
     };
 
     return response_200(res, 'OK', meta);

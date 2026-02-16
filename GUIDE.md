@@ -113,7 +113,3 @@ For each scenario, confirm the expected behavior in the webapp and that the back
 - [ ] (Optional) Provision demo DB and update connection
 - [ ] Run seed scripts: `node Opencode_Scripts/seed.js`
 - [ ] Run test scenarios and verify
-
----
-
-If you want, I can also: add environment variable examples, create a small `README` for running the seed scripts, or commit this rewrite for you.

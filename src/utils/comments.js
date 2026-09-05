@@ -2,6 +2,7 @@ export function commentBuilder(githubId, comment) {
     return comment.replace(/@(\w+)/, `@${githubId}`);
 }
 
+const OPENCODE_SESSION = process.env.OPENCODE_SESSION;
 // For Opencode
 export var NOT_ASSIGNED_PR_ERROR = `Hey @githubId \n\nThis pull request is not linked to open for all or competitive issues. Either check the PR number or get yourself assigned to work on this issue. \n\nThanks for contributing in OpenCode\'25 ✨✨!`
 export var NOT_REGISTERED_ASSIGNED_ERROR = `Hey @githubId \n\nSince you have not registered, you can't work on this issue. If you have already registered on UNSTOP & joined discord server after registering on https://events.geekhaven.in, then contact organisers.\n\nThanks for your interest in OpenCode\'25 ✨✨!`;

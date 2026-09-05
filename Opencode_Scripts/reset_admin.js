@@ -22,13 +22,13 @@ async function main() {
   });
   console.log(`🗑️ Issues deleted: ${issues.count}`);
 
-  // 3️⃣ Leaderboard Snapshots
-  const lbs = await prisma.leaderboardSnapshot.deleteMany({
-    where: {
-      participantId: ADMIN_GITHUB_ID,
-    },
-  });
-  console.log(`🗑️ LeaderboardSnapshots deleted: ${lbs.count}`);
+  //  3️⃣ Leaderboard Snapshots
+  // const lbs = await prisma.leaderboardSnapshot.deleteMany({
+  //   where: {
+  //     participantId: ADMIN_GITHUB_ID,
+  //   },
+  // });
+  // console.log(`🗑️ LeaderboardSnapshots deleted: ${lbs.count}`);
 
   // 4️⃣ Leaderboard Entries
   const lbe = await prisma.leaderboardEntry.deleteMany({

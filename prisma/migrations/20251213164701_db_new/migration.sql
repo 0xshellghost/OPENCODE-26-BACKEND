@@ -1,14 +1,14 @@
 -- CreateTable
-CREATE TABLE `LeaderboardSnapshot` (
-    `id` VARCHAR(191) NOT NULL,
-    `participantId` VARCHAR(191) NOT NULL,
-    `eventName` VARCHAR(191) NOT NULL,
-    `date` DATETIME(3) NOT NULL,
-    `totalPoints` INTEGER NOT NULL DEFAULT 0,
-    `PRmerged` INTEGER NOT NULL DEFAULT 0,
-
-    INDEX `LeaderboardSnapshot_eventName_date_idx`(`eventName`, `date`),
-    INDEX `LeaderboardSnapshot_participantId_date_idx`(`participantId`, `date`),
-    UNIQUE INDEX `LeaderboardSnapshot_participantId_eventName_date_key`(`participantId`, `eventName`, `date`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- CREATE TABLE `LeaderboardSnapshot` (
+--     `id` VARCHAR(191) NOT NULL,
+--     `participantId` VARCHAR(191) NOT NULL,
+--     `eventName` VARCHAR(191) NOT NULL,
+--     `date` DATETIME(3) NOT NULL,
+--     `totalPoints` INTEGER NOT NULL DEFAULT 0,
+--     `PRmerged` INTEGER NOT NULL DEFAULT 0,
+-- 
+--     INDEX `LeaderboardSnapshot_eventName_date_idx`(`eventName`, `date`),
+--     INDEX `LeaderboardSnapshot_participantId_date_idx`(`participantId`, `date`),
+--     UNIQUE INDEX `LeaderboardSnapshot_participantId_eventName_date_key`(`participantId`, `eventName`, `date`),
+--     PRIMARY KEY (`id`)
+-- ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

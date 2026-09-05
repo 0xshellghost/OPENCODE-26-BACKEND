@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import router from './routes/index.js';
 import { connDB } from './config/db.config.js';
-import { startLeaderboardSnapshotJob } from "./jobs/leaderboardSnapshot.job.js";
+// import { startLeaderboardSnapshotJob } from "./jobs/leaderboardSnapshot.job.js";
 import { startBackupCron } from './jobs/backupCron.job.js';
 
 

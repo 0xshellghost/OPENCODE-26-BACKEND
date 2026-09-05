@@ -5,7 +5,7 @@
 
 */
 -- AlterTable
-ALTER TABLE `user` MODIFY `gender` VARCHAR(20) NOT NULL DEFAULT 'male';
+ALTER TABLE `User` MODIFY `gender` VARCHAR(20) NOT NULL DEFAULT 'male';
 
 -- CreateTable
 CREATE TABLE `LeaderboardEvent` (

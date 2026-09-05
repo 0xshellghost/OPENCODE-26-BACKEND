@@ -255,26 +255,26 @@ async function createPRs(issues, participants) {
 /* =======================
    SNAPSHOTS (FROM REGISTRATION DATE)
 ======================= */
-async function createLeaderboardSnapshots(participants) {
-  for (const p of participants) {
-    let points = 0;
-    const dates = getDatesBetween(p.registeredAt, END_DATE);
-
-    for (const date of dates) {
-      points += faker.number.int({ min: 0, max: 20 });
-
-      await prisma.leaderboardSnapshot.create({
-        data: {
-          participantId: p.participantId,
-          eventName: EVENT_NAME,
-          date,
-          totalPoints: points,
-          PRmerged: Math.floor(points / 50)
-        }
-      });
-    }
-  }
-}
+// async function createLeaderboardSnapshots(participants) {
+//   for (const p of participants) {
+//     let points = 0;
+//     const dates = getDatesBetween(p.registeredAt, END_DATE);
+// 
+//     for (const date of dates) {
+//       points += faker.number.int({ min: 0, max: 20 });
+// 
+//       await prisma.leaderboardSnapshot.create({
+//         data: {
+//           participantId: p.participantId,
+//           eventName: EVENT_NAME,
+//           date,
+//           totalPoints: points,
+//           PRmerged: Math.floor(points / 50)
+//         }
+//       });
+//     }
+//   }
+// }
 
 async function createLeaderboardEntriesFromPRs() {
   // group merged PRs by participant
@@ -317,7 +317,7 @@ async function main() {
 
   await createPRs(issues, participants);
 await createLeaderboardEntriesFromPRs(); // ✅ ADD THIS
-await createLeaderboardSnapshots(participants);
+// await createLeaderboardSnapshots(participants);
 
 }
 

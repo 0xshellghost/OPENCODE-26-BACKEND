@@ -18,12 +18,12 @@ async function main() {
   console.log(`🗑️ PRs deleted: ${pr.count}`);
 
   // 2️⃣ Leaderboard Snapshots
-  const lbs = await prisma.leaderboardSnapshot.deleteMany({
-    where: {
-      participantId: { not: KEEP_GITHUB_ID },
-    },
-  });
-  console.log(`🗑️ LeaderboardSnapshots deleted: ${lbs.count}`);
+  // const lbs = await prisma.leaderboardSnapshot.deleteMany({
+  //   where: {
+  //     participantId: { not: KEEP_GITHUB_ID },
+  //   },
+  // });
+  // console.log(`🗑️ LeaderboardSnapshots deleted: ${lbs.count}`);
 
   // 3️⃣ Leaderboard Entries
   const lbe = await prisma.leaderboardEntry.deleteMany({

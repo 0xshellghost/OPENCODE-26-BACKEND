@@ -63,7 +63,8 @@ async function createAdmin() {
           branch: "CSE",
           degree: "B.Tech",
           githubId: "opencode-admin",
-          isAdmin: true
+          isAdmin: true,
+          year: "2023"
         }
       }
     }
@@ -91,11 +92,12 @@ async function createParticipants(count = 100) {
           "IIT BHU",
           "NIT Allahabad"
         ]),
-        graduationYear: faker.number.int({ min: 2025, max: 2028 }),
+        graduationYear: faker.number.int({ min: 2026, max: 2029 }),
         branch: "CSE",
         degree: "B.Tech",
         githubId,
-        createdAt: registeredAt
+        createdAt: registeredAt,
+        year: faker.number.int({ min: 2023, max: 2026 }).toString(),
       }
     });
 

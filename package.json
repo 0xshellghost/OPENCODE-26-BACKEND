@@ -9,6 +9,7 @@
         "dev": "nodemon ./src/app.js",
         "pushdb": "prisma db push",
         "migrate": "prisma migrate dev",
+        "webhook": "npx smee-client -u https://smee.io/LUxZfFA3TdLTUfdX -t http://localhost:4000/api/v1/github-bot",
         "format": "prettier --write \"src/**/*.js\""
     },
     "keywords": [],

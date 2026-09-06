@@ -291,6 +291,64 @@ const addRepo = async (req, res) => {
     }
 };
 
+const deleteRepo = async req, res => {
+    try {
+        const { eventName } = req.params;
+        const { repoName } = req.body; 
+
+        if (!eventName || !repoName) {
+            response_400(
+                res,
+                'Event id and repo name are required to delete a repo'
+            );
+        }
+
+        const adminUser = await prisma.admin.findUnique({
+            where: {
+                userId: req.user.id
+            }
+        });
+
+        if (!adminUser) {
+            response_403(
+                res,
+                `${req.user.id} is not an admin/user of this platform`
+            );
+        }
+
+        const event = await prisma.event.findUnique({
+            where: {
+                name: eventName
+            }
+        });
+
+        if (!event) {
+            response_404(res, 'Could not find the event');
+        }
+
+        // delete repo
+        const repo = await prisma.repo.findFirst({
+            where: {
+                name: repoName,
+                eventName: eventName,
+                deletedAt: null
+            }
+        });
+
+        if (!repo) {
+            response_404(res, 'Repo already deleted or not found.');
+        } else {
+            await prisma.repo.update({
+                where: { id: repo.id },
+                data: { deletedAt: new Date() }
+            });
+
+            response_204(res, 'Repo deleted successfully');
+        }
+    } catch (error) {
+        response_500(res, 'Error while deleting repo', error);
+    }
+};
 // Controller to get all repos of an event
 const getAllReposOfEvent = async (req, res) => {
     try {
@@ -307,10 +365,7 @@ const getAllReposOfEvent = async (req, res) => {
         }
 
         response_200(res, 'Repos fetched successfully', repos);
-    } catch (error) {
-        response_500(res, 'Error while fetching repos', error);
-    }
-};
+    } };
 
 // Point increment/decrement mechanisam of a PR (hence leaderboard)
 const incrementPoints = async (req, res) => {

@@ -828,7 +828,7 @@ const pullRequestMerged = async (req, res) => {
 
         
         // OpenCode
-        const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing in OpenCode\'25✨✨`;
+        const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing is ${OPENCODE_SESSION}✨✨`;
         // GeekCamp
         //const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for participating in GeekCamp ✨✨`;
         commentOnAPullRequest(repoName, PRNumber, PR_MERGED);

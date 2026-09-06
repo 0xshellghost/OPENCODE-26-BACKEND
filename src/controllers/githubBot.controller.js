@@ -21,6 +21,8 @@ import {
 import {commentOnAnIssue, fetchCommentsFromGitHub} from '../utils/commentOnAnIssue.js';
 export const routerFunction = (req, res) => {
     switch (req.headers['x-github-event']) {
+        case 'ping':
+            return res.status(200).json({ message: 'pong' });
         case 'issues':
             switch (req.body.action) {
                 case 'assigned':
@@ -86,7 +88,7 @@ export const routerFunction = (req, res) => {
         //     break;
 
         default:
-            return res.status(400);
+            return res.status(200).json({ message: `Ignored unhandled event: ${req.headers['x-github-event']}` });
     }
 };
 
@@ -560,7 +562,7 @@ const pullRequestOpened = async (req, res) => {
         })
 
 
-        if (repo.isFirstYrOnly && user.year != '1st Year'){
+        if (repo?.isFirstYrOnly && user?.year != '1st Year'){
             commentOnAPullRequest(
                 repoName,
                 PRNumber,

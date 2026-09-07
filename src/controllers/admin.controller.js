@@ -290,6 +290,183 @@ const addRepo = async (req, res) => {
         response_500(res, 'Error while adding repo', error);
     }
 };
+//deletes repo and ev ery instance of it 
+const deleteRepo = async (req, res) => {
+    try {
+        const { eventName, repoName } = req.params;
+
+        if (!eventName || !repoName) {
+            return response_400(
+                res,
+                'Event name and repo name are required to delete a repo'
+            );
+        }
+
+        const adminUser = await prisma.admin.findUnique({
+            where: {
+                userId: req.user.id
+            }
+        });
+
+        if (!adminUser) {
+            return response_400(
+                res,
+                `${req.user.id} is not an admin/user of this platform`
+            );
+        }
+
+        const event = await prisma.event.findUnique({
+            where: {
+                name: eventName
+            }
+        });
+
+        if (!event) {
+            return response_400(res, 'Could not find the event');
+        }
+
+        const repo = await prisma.repo.findFirst({
+            where: {
+                name: repoName,
+                event: {
+                    name: eventName
+                }
+            }
+        });
+
+        if (!repo) {
+            return response_404(
+                res,
+                'Could not find the repo for this event'
+            );
+        }
+
+        const deletedRepo = await prisma.$transaction(async (transaction) => {
+            await transaction.pR.deleteMany({
+                where: {
+                    issue: {
+                        repoName: repo.name
+                    }
+                }
+            });
+
+            await transaction.issue.deleteMany({
+                where: {
+                    repoName: repo.name
+                }
+            });
+
+            return transaction.repo.delete({
+                where: {
+                    id: repo.id
+                }
+            });
+        });
+
+        return response_200(
+            res,
+            'Repo deleted successfully',
+            deletedRepo
+        );
+
+    } catch (error) {
+        return response_500(
+            res,
+            'Error while deleting repo',
+            error
+        );
+    }
+};
+
+//renames the repo and every issue and pr associated with it 
+const renameRepo = async (req, res) => {
+    try {
+        const { eventName, repoName } = req.params;
+        const { newRepoName } = req.body;
+
+        if (!eventName || !repoName || !newRepoName) {
+            return response_400(
+                res,
+                'Event name, repo name and new repo name are required to rename a repo'
+            );
+        }
+
+        const adminUser = await prisma.admin.findUnique({
+            where: {
+                userId: req.user.id
+            }
+        });
+
+        if (!adminUser) {
+            return response_400(
+                res,
+                `${req.user.id} is not an admin/user of this platform`
+            );
+        }
+
+        const event = await prisma.event.findUnique({
+            where: {
+                name: eventName
+            }
+        });
+
+        if (!event) {
+            return response_400(res, 'Could not find the event');
+        }
+
+        const repo = await prisma.repo.findFirst({
+            where: {
+                name: repoName,
+                event: {
+                    name: eventName
+                }
+            }
+        });
+
+        if (!repo) {
+            return response_404(
+                res,
+                'Could not find the repo for this event'
+            );
+            
+        }
+
+        const updatedRepo = await prisma.$transaction(async (transaction) => {
+            const renamedRepo = await transaction.repo.update({
+                where: {
+                    id: repo.id
+                },
+                data: {
+                    name: newRepoName
+                }
+            });
+
+            await transaction.issue.updateMany({
+                where: {
+                    repoName: repo.name
+                },
+                data: {
+                    repoName: newRepoName
+                }
+            });
+
+            return renamedRepo;
+        });
+
+        return response_200(
+            res,
+            'Repo renamed successfully',
+            updatedRepo
+        );
+
+    } catch (error) {
+        return response_500(
+            res,
+            'Error while renaming repo',
+            error
+        );
+    }
+};
 
 const deleteRepo = async req, res => {
     try {
@@ -457,6 +634,8 @@ export {
     getEvents,
     addAdmin,
     addRepo,
+    deleteRepo,
+    renameRepo,
     getAllReposOfEvent,
     incrementPoints
 };

@@ -18,7 +18,7 @@ import {
     FIRST_YEAR_ONLY_REPO,
     GIRLS_ONLY_REPO
 } from '../utils/comments.js';
-import {commentOnAnIssue, fetchCommentsFromGitHub} from '../utils/commentOnAnIssue.js';
+import { commentOnAnIssue, fetchCommentsFromGitHub } from '../utils/commentOnAnIssue.js';
 export const routerFunction = (req, res) => {
     switch (req.headers['x-github-event']) {
         case 'ping':
@@ -44,7 +44,7 @@ export const routerFunction = (req, res) => {
                     issueClosed(req, res);
                     break;
                 case 'reopened':
-                    issueReopened(req,res);
+                    issueReopened(req, res);
                     break;
                 default:
                     return res.status(200).json();
@@ -55,11 +55,11 @@ export const routerFunction = (req, res) => {
                 case 'created':
 
                     issueCommentCreated(req, res);
-                    
+
                     break;
                 default:
                     return res.status(200).json();
-                }
+            }
             break;
         case 'pull_request':
             switch (req.body.action) {
@@ -75,7 +75,7 @@ export const routerFunction = (req, res) => {
                     else pullRequestClosed(req, res);
                     break;
                 case 'reopened':
-                    pullRequestReopened(req,res);
+                    pullRequestReopened(req, res);
                     break;
                 default:
                     return res.status(200).json();
@@ -95,10 +95,10 @@ export const routerFunction = (req, res) => {
 const push = async (req, res) => {
 
     try {
-        const commits = req.body.commits 
+        const commits = req.body.commits
         console.log(commits)
     }
-    catch(err) {
+    catch (err) {
         console.log("Some error: ", err)
     }
 }
@@ -190,11 +190,11 @@ const issueLabeled = async (req, res) => {
         }
 
         console.log("Issue Relabeled with : ", {
-                repoName: repoName,
-                issueNumber: issueNumber,
-                openForAll: openForAll,
-                currentPoints: currentPoints
-            })
+            repoName: repoName,
+            issueNumber: issueNumber,
+            openForAll: openForAll,
+            currentPoints: currentPoints
+        })
     } catch (error) {
         console.error(error);
         return res.status(200).json();
@@ -258,12 +258,12 @@ const issueOpened = async (req, res) => {
             }
         });
         console.log("Issue Created with : ", {
-                repoName: repoName,
-                title: title,
-                issueNumber: issueNumber,
-                openForAll: openForAll,
-                currentPoints: currentPoints
-            })
+            repoName: repoName,
+            title: title,
+            issueNumber: issueNumber,
+            openForAll: openForAll,
+            currentPoints: currentPoints
+        })
         return res.status(200).json();
     } catch (error) {
         console.error(error);
@@ -324,11 +324,11 @@ const issueCommentCreated = async (req, res) => {
         const issueNumber = req.body.issue.number;
         const repoName = req.body.repository.name;
         const commentBody = req.body.comment.body;
-        
+
         if (!commentBody.startsWith('/info') && !commentBody.startsWith('/shazam')) {
             return res.status(200).json();
         }
-        
+
         const comments = await fetchCommentsFromGitHub(repoName, issueNumber);
         const uniqueUsers = [...new Set(comments.map(comment => comment.user.login))];
 
@@ -339,7 +339,7 @@ const issueCommentCreated = async (req, res) => {
                         where: { githubId: user },
                         select: { isAdmin: true },
                     });
-        
+
                     if (!userRecord) {
                         return {
                             user,
@@ -350,7 +350,7 @@ const issueCommentCreated = async (req, res) => {
                             }],
                         };
                     }
-        
+
                     if (userRecord.isAdmin) {
                         return null;
                     }
@@ -363,14 +363,14 @@ const issueCommentCreated = async (req, res) => {
                             status: true,
                         },
                     });
-        
+
                     if (issues.length > 0) {
                         return {
                             user,
                             issues: issues.map(issue => ({
-                                repoName: `[${issue.repoName}](https://github.com/${process.env.ORG_NAME}/${issue.repoName})`, 
+                                repoName: `[${issue.repoName}](https://github.com/${process.env.ORG_NAME}/${issue.repoName})`,
                                 issueDetails: `${issue.issueNumber} - ${issue.title}`,
-                                status: issue.status, 
+                                status: issue.status,
                             })),
                         };
                     }
@@ -384,21 +384,21 @@ const issueCommentCreated = async (req, res) => {
                     };
                 })
             );
-        
+
             const tableHeader = '| User | Repo | Issue Details | Status |\n|------|------|---------------|--------|\n';
             const tableRows = userIssueData
                 .filter(data => data !== null)
                 .flatMap(({ user, issues }) =>
-                    issues.map(issue => 
+                    issues.map(issue =>
                         `| ${user} | ${issue.repoName} | ${issue.issueDetails} | ${issue.status} |`
                     )
                 )
                 .join('\n');
-        
+
             const responseComment = tableHeader + tableRows;
-            await commentOnAnIssue( repoName, issueNumber, responseComment);
+            await commentOnAnIssue(repoName, issueNumber, responseComment);
         }
-                              
+
         else if (commentBody.startsWith('/info')) {
             const userRepoData = await Promise.all(
                 uniqueUsers.map(async (user) => {
@@ -406,7 +406,7 @@ const issueCommentCreated = async (req, res) => {
                         where: { githubId: user },
                         select: { isAdmin: true },
                     });
-        
+
                     if (!userRecord) {
                         return {
                             user,
@@ -423,17 +423,40 @@ const issueCommentCreated = async (req, res) => {
                         },
                         select: {
                             repoName: true,
+                            createdAt: true,
                         },
                     });
-        
+                    //console.log(activeIssues)
                     if (activeIssues.length > 0) {
                         const repoCounts = activeIssues.reduce((acc, issue) => {
-                            acc[issue.repoName] = (acc[issue.repoName] || 0) + 1;
+                            if (!acc[issue.repoName]) {
+                                acc[issue.repoName] = {
+                                    count: 0,
+                                    timeStamp: []
+                                }
+                            }
+                            acc[issue.repoName].count++;
+                            acc[issue.repoName].timeStamp.push(issue.createdAt);
                             return acc;
                         }, {});
-        
+
                         const repoInfo = Object.entries(repoCounts)
-                            .map(([repo, count]) => `${repo} (${count})`)
+                            .map(([repo, data]) => {
+                                const times = data.timeStamp
+                                    .map(timestamp =>
+                                        new Date(timestamp).toLocaleString('en-IN', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            hour12: true,
+                                            timeZone: 'Asia/Kolkata'
+                                        })
+                                    )
+                                    .join(', ');
+                                    //console.log(times)
+                                    return `${repo} | ${data.count} | ${times}`;
+                            })
                             .join(', ');
                         return {
                             user,
@@ -442,20 +465,23 @@ const issueCommentCreated = async (req, res) => {
                     }
                     return {
                         user,
-                        repoInfo: '0',
+                        repoInfo: ` 0 | N/A | N/A`,
+                        
                     };
                 })
             );
-            
-            
-            const tableHeader = '| User | Repo |\n|------|-----------|\n';
+
+
+
+
+            const tableHeader = '| User | Repo | Count | Timestamps |\n|------|------|-------|------------|\n';
             const tableRows = userRepoData
                 .filter((data) => data !== null)
                 .map(({ user, repoInfo }) => `| ${user} | ${repoInfo} |`)
                 .join('\n');
-        
+
             const responseComment = tableHeader + tableRows;
-            await commentOnAnIssue( repoName, issueNumber, responseComment);
+            await commentOnAnIssue(repoName, issueNumber, responseComment);
         }
         return res.status(200).json();
     } catch (error) {
@@ -474,7 +500,7 @@ const issueCommentCreated = async (req, res) => {
 //         if (commentBody.startsWith('/assign')) {
 //             const assignee = req.body.issue.user.login; 
 //             console.log(assignee);
-            
+
 //             if (!assignee) {
 //                 return res.status(400).json({ error: 'No assignee specified in the command.' });
 //             }
@@ -492,10 +518,10 @@ const issueCommentCreated = async (req, res) => {
 //             }
 //             return res.status(200).json();
 //         }
-        
+
 //         const comments = await fetchCommentsFromGitHub( repoName, issueNumber);
 //         const uniqueUsers = [...new Set(comments.map(comment => comment.user.login))];
-        
+
 //         if (commentBody.startsWith('/info')) {
 //             const userIssueData = await Promise.all(
 //                 uniqueUsers.map(async (user) => {
@@ -527,9 +553,9 @@ const issueCommentCreated = async (req, res) => {
 //                 .join('\n');
 
 //             const responseComment = tableHeader + tableRows;
-            
+
 //             // console.log(repoName, issueNumber, responseComment)
-            
+
 //             await commentOnAnIssue( repoName, issueNumber, responseComment);
 //             console.log('Comment Created on: ', repoName, " Issue: ", issueNumber)
 //             return res.status(200).json();
@@ -547,8 +573,8 @@ const pullRequestOpened = async (req, res) => {
         const githubId = req.body.pull_request.user.login;
         const repoName = req.body.repository.name;
         const { body, number: PRNumber, title, id } = req.body.pull_request;
-        let issueNumber=0;
-        
+        let issueNumber = 0;
+
         const user = await prisma.user.findUnique({
             where: {
                 githubId: githubId
@@ -562,7 +588,7 @@ const pullRequestOpened = async (req, res) => {
         })
 
 
-        if (repo?.isFirstYrOnly && user?.year != '1st Year'){
+        if (repo?.isFirstYrOnly && user?.year != '1st Year') {
             commentOnAPullRequest(
                 repoName,
                 PRNumber,
@@ -584,13 +610,13 @@ const pullRequestOpened = async (req, res) => {
 
 
 
-        if(/Issue\s*:\s*#(\d+)/i.test(body)){
+        if (/Issue\s*:\s*#(\d+)/i.test(body)) {
             const match = body.match(/Issue\s*:\s*#(\d+)/i);
             issueNumber = match ? parseInt(match[1], 10) : null;
         }
         //const issueNumber = parseInt(body.match(/Issue\s*:\s*#(\d+)/i)?.[1],10);
         //console.log("issue num " + issueNumber);
-        if (issueNumber!==0) {
+        if (issueNumber !== 0) {
             const participant = await prisma.participant.findUnique({
                 where: {
                     participantId: githubId
@@ -670,7 +696,7 @@ const pullRequestOpened = async (req, res) => {
                         commentBuilder(githubId, NOT_ASSIGNED_PR_ERROR)
                     );
                 } else {
-                    
+
                     await prisma.pR.create({
                         data: {
                             id: id,
@@ -693,7 +719,7 @@ const pullRequestOpened = async (req, res) => {
             commentOnAPullRequest(
                 repoName,
                 PRNumber,
-                commentBuilder(githubId,TEMPLATE_NOT_FOLLOWED_ERROR)
+                commentBuilder(githubId, TEMPLATE_NOT_FOLLOWED_ERROR)
             );
         }
         return res.status(200).json();
@@ -815,7 +841,7 @@ const pullRequestMerged = async (req, res) => {
                 }
             }
         });
-        
+
 
         await prisma.leaderboardEvent.create({
             data: {
@@ -828,14 +854,14 @@ const pullRequestMerged = async (req, res) => {
             }
         });
 
-        
+
         // OpenCode
         const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for contributing is ${OPENCODE_SESSION}✨✨`;
         // GeekCamp
         //const PR_MERGED = `Hey @${githubId}\n\nYour PR has been merged 🥳🥳 and you have earned **${currentPoints} points**. \n\nThanks for participating in GeekCamp ✨✨`;
         commentOnAPullRequest(repoName, PRNumber, PR_MERGED);
         console.log('PR Merged on Repo: ', repoName, ' PR: ', PRNumber);
-                
+
         return res.status(200).json();
     } catch (error) {
         console.error(error);

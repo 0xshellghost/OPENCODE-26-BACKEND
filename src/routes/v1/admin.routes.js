@@ -1,6 +1,8 @@
 import express from 'express';
 import {
     addRepo,
+    deleteRepo,
+    renameRepo,
     createEvent,
     deleteEvent,
     getAllReposOfEvent,
@@ -21,8 +23,10 @@ router.delete('/delete/:eventName', deleteEvent);
 // get all created Event
 router.get('/events', getEvents);
 router.post('/event/:eventName/repos/add', addRepo);
-// add repos
-router.get('/event/:eventName/repos/delete',deleteRepo) //delete repo
+// rename repos
+router.patch('/event/:eventName/repos/:repoName/rename', renameRepo);
+// delete repos
+router.delete('/event/:eventName/repos/:repoName/delete', deleteRepo);
 // make another user as admin from admin account
 router.post('/:userId/addAdmin', addAdmin);
 // get all repos

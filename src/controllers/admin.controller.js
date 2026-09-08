@@ -30,7 +30,10 @@ const createEvent = async (req, res) => {
 
         // require logo file
         if (!logoFiles.length) {
-            return response_400(res, 'Logo image is required to create an event');
+            return response_400(
+                res,
+                'Logo image is required to create an event'
+            );
         }
 
         const userId = req.user.id;
@@ -39,10 +42,10 @@ const createEvent = async (req, res) => {
                 userId: userId //LHS = userId (numbers), RHS = userId (string (username))
             }
         });
-        
 
         if (admin) {
-            const logoImageCloudinary = (await getDataURI(logoFiles[0])).content;
+            const logoImageCloudinary = (await getDataURI(logoFiles[0]))
+                .content;
             const imageUpload = await cloudinary.uploader.upload(
                 logoImageCloudinary,
                 {
@@ -56,10 +59,13 @@ const createEvent = async (req, res) => {
             );
 
             // guard coverFiles to avoid calling .map on undefined
-            const coverImagesArray = Array.isArray(coverFiles) ? coverFiles : [];
+            const coverImagesArray = Array.isArray(coverFiles)
+                ? coverFiles
+                : [];
             const coverImageLinks = await Promise.all(
                 coverImagesArray.map(async (coverFile, idx) => {
-                    const coverImageCloudinary = (await getDataURI(coverFile)).content;
+                    const coverImageCloudinary = (await getDataURI(coverFile))
+                        .content;
                     const imageUpload = await cloudinary.uploader.upload(
                         coverImageCloudinary,
                         {
@@ -88,14 +94,14 @@ const createEvent = async (req, res) => {
                     logoImageURL: imageUpload.secure_url,
                     coverImagesURL: coverImageLinks.length
                         ? {
-                            createMany: {
-                                data: coverImageLinks.map((coverImage) => {
-                                    return {
-                                        url: coverImage
-                                    };
-                                })
-                            }
-                        }
+                              createMany: {
+                                  data: coverImageLinks.map((coverImage) => {
+                                      return {
+                                          url: coverImage
+                                      };
+                                  })
+                              }
+                          }
                         : undefined
                 },
                 select: {
@@ -127,7 +133,7 @@ const deleteEvent = async (req, res) => {
             }
         });
         if (!admin) {
-            console.log("Error form Here")
+            console.log('Error form Here');
             return response_403(res, 'Only admins can delete events');
         }
         if (!eventName) {
@@ -156,7 +162,7 @@ const getEvents = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        console.log("User ID in getEvents:", userId);
+        console.log('User ID in getEvents:', userId);
         const admin = await prisma.admin.findUnique({
             where: {
                 userId: userId
@@ -167,7 +173,7 @@ const getEvents = async (req, res) => {
         });
         const events = admin.Event?.filter((event) => !event.deletedAt);
 
-        console.log(events)
+        console.log(events);
 
         response_200(res, 'Events fetched successfully', events);
     } catch (error) {
@@ -254,7 +260,6 @@ const addRepo = async (req, res) => {
         // get the repo description from github api
         const repoDetails = await getRepoDetails(adminUser.userId, repoName);
 
-        
         // add repo to event
         if (repoDetails) {
             const updateAdmin = await prisma.admin.update({
@@ -290,7 +295,7 @@ const addRepo = async (req, res) => {
         response_500(res, 'Error while adding repo', error);
     }
 };
-//deletes repo and ev ery instance of it 
+//deletes repo and ev ery instance of it
 const deleteRepo = async (req, res) => {
     try {
         const { eventName, repoName } = req.params;
@@ -335,10 +340,7 @@ const deleteRepo = async (req, res) => {
         });
 
         if (!repo) {
-            return response_404(
-                res,
-                'Could not find the repo for this event'
-            );
+            return response_404(res, 'Could not find the repo for this event');
         }
 
         const deletedRepo = await prisma.$transaction(async (transaction) => {
@@ -363,22 +365,13 @@ const deleteRepo = async (req, res) => {
             });
         });
 
-        return response_200(
-            res,
-            'Repo deleted successfully',
-            deletedRepo
-        );
-
+        return response_200(res, 'Repo deleted successfully', deletedRepo);
     } catch (error) {
-        return response_500(
-            res,
-            'Error while deleting repo',
-            error
-        );
+        return response_500(res, 'Error while deleting repo', error);
     }
 };
 
-//renames the repo and every issue and pr associated with it 
+//renames the repo and every issue and pr associated with it
 const renameRepo = async (req, res) => {
     try {
         const { eventName, repoName } = req.params;
@@ -424,11 +417,7 @@ const renameRepo = async (req, res) => {
         });
 
         if (!repo) {
-            return response_404(
-                res,
-                'Could not find the repo for this event'
-            );
-            
+            return response_404(res, 'Could not find the repo for this event');
         }
 
         const updatedRepo = await prisma.$transaction(async (transaction) => {
@@ -453,79 +442,12 @@ const renameRepo = async (req, res) => {
             return renamedRepo;
         });
 
-        return response_200(
-            res,
-            'Repo renamed successfully',
-            updatedRepo
-        );
-
+        return response_200(res, 'Repo renamed successfully', updatedRepo);
     } catch (error) {
-        return response_500(
-            res,
-            'Error while renaming repo',
-            error
-        );
+        return response_500(res, 'Error while renaming repo', error);
     }
 };
 
-const deleteRepo = async req, res => {
-    try {
-        const { eventName } = req.params;
-        const { repoName } = req.body; 
-
-        if (!eventName || !repoName) {
-            response_400(
-                res,
-                'Event id and repo name are required to delete a repo'
-            );
-        }
-
-        const adminUser = await prisma.admin.findUnique({
-            where: {
-                userId: req.user.id
-            }
-        });
-
-        if (!adminUser) {
-            response_403(
-                res,
-                `${req.user.id} is not an admin/user of this platform`
-            );
-        }
-
-        const event = await prisma.event.findUnique({
-            where: {
-                name: eventName
-            }
-        });
-
-        if (!event) {
-            response_404(res, 'Could not find the event');
-        }
-
-        // delete repo
-        const repo = await prisma.repo.findFirst({
-            where: {
-                name: repoName,
-                eventName: eventName,
-                deletedAt: null
-            }
-        });
-
-        if (!repo) {
-            response_404(res, 'Repo already deleted or not found.');
-        } else {
-            await prisma.repo.update({
-                where: { id: repo.id },
-                data: { deletedAt: new Date() }
-            });
-
-            response_204(res, 'Repo deleted successfully');
-        }
-    } catch (error) {
-        response_500(res, 'Error while deleting repo', error);
-    }
-};
 // Controller to get all repos of an event
 const getAllReposOfEvent = async (req, res) => {
     try {
@@ -542,7 +464,10 @@ const getAllReposOfEvent = async (req, res) => {
         }
 
         response_200(res, 'Repos fetched successfully', repos);
-    } };
+    } catch {
+        console.log(error);
+    }
+};
 
 // Point increment/decrement mechanisam of a PR (hence leaderboard)
 const incrementPoints = async (req, res) => {
@@ -556,6 +481,24 @@ const incrementPoints = async (req, res) => {
             pointIncrement
         } = req.body;
 
+        s;
+        const pr = await prisma.pR.findFirst({
+            where: {
+                prNumber,
+                submitterId: githubId,
+                issue: {
+                    issueNumber,
+                    repoName,
+                    repo: {
+                        eventName
+                    }
+                }
+            },
+            select: {
+                id: true,
+                issueId: true
+            }
+        });
         await prisma.participant.update({
             where: {
                 participantId: githubId
@@ -617,11 +560,25 @@ const incrementPoints = async (req, res) => {
                             }
                         }
                     }
+                },
+
+                LeaderboardEvents: {
+                    create: {
+                        event: {
+                            connect: {
+                                name: eventName
+                            }
+                        }
+                    },
+                    type: 'MANUAL_ADJUSTMENT',
+                    pointsDelta: pointIncrement,
+                    prId: pr.id,
+                    issueId: pr.issueId
                 }
             }
         });
 
-        response_200(res, 'Points updated');
+        return response_200(res, 'Points updated');
     } catch (error) {
         console.log(error);
         response_500(res, 'Error while points modification', error);

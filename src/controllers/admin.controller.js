@@ -481,7 +481,6 @@ const incrementPoints = async (req, res) => {
             pointIncrement
         } = req.body;
 
-        s;
         const pr = await prisma.pR.findFirst({
             where: {
                 prNumber,
@@ -499,6 +498,7 @@ const incrementPoints = async (req, res) => {
                 issueId: true
             }
         });
+        if (!pr) return response_404(res, 'PR NOT FOUND');
         await prisma.participant.update({
             where: {
                 participantId: githubId
@@ -568,12 +568,12 @@ const incrementPoints = async (req, res) => {
                             connect: {
                                 name: eventName
                             }
-                        }
-                    },
-                    type: 'MANUAL_ADJUSTMENT',
-                    pointsDelta: pointIncrement,
-                    prId: pr.id,
-                    issueId: pr.issueId
+                        },
+                        type: 'MANUAL_ADJUSTMENT',
+                        pointsDelta: pointIncrement,
+                        prId: pr.id,
+                        issueId: pr.issueId
+                    }
                 }
             }
         });
@@ -581,7 +581,7 @@ const incrementPoints = async (req, res) => {
         return response_200(res, 'Points updated');
     } catch (error) {
         console.log(error);
-        response_500(res, 'Error while points modification', error);
+        return response_500(res, 'Error while points modification', error);
     }
 };
 

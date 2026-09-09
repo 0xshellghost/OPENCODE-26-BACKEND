@@ -122,7 +122,10 @@ const getLeaderboard = async (req, res) => {
                             select: {
                                 name: true,
                                 githubId: true,
-                                avatarUrl: true
+                                avatarUrl: true,
+                                college: true,
+                                graduationYear: true,
+                                createdAt: true
                             }
                         }
                     }
@@ -130,18 +133,25 @@ const getLeaderboard = async (req, res) => {
             },
             orderBy: [
                 { points: 'desc' },
-                { PRmerged: 'desc' },
+                { Participant: { User: { createdAt: 'asc' } } },
                 { participantId: 'asc' }
             ]
         });
 
         // Deterministic ordering + dense ranking for stable ties
-        let lastPoints = null;
+        let lastRank = null;
         let rankCounter = 0;
         const formattedLeaderboard = leaderboardOfEvent.map((entry) => {
-            if (lastPoints === null || entry.points !== lastPoints) {
+            const rank = [
+                entry.points,
+                entry.Participant.User.createdAt.getTime()
+            ];
+            if (
+                lastRank === null ||
+                rank.some((value, index) => value !== lastRank[index])
+            ) {
                 rankCounter += 1;
-                lastPoints = entry.points;
+                lastRank = rank;
             }
             return {
                 position: rankCounter,
@@ -149,7 +159,9 @@ const getLeaderboard = async (req, res) => {
                 githubid: entry.Participant.User.githubId,
                 prmerged: entry.PRmerged,
                 points: entry.points,
-                avatarUrl: entry.Participant.User.avatarUrl
+                avatarUrl: entry.Participant.User.avatarUrl,
+                collegeName: entry.Participant.User.college,
+                graduationYear: entry.Participant.User.graduationYear
                 // prDetailsURL: `${process.env.BACKEND_URL}/api/v1/participant/${entry.Participant.User.githubId}/${req.params.eventName}/pr`
             };
         });

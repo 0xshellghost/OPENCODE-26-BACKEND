@@ -4,47 +4,31 @@ import dotenv from "dotenv";
 dotenv.config();
 
 
-const ORG_NAME = "OpenCode2025"; // e.g. geekhaven-opencode
+const ORG_NAME = "opencodeiiita"; // e.g. geekhaven-opencode
 const GITHUB_TOKEN_BOT = process.env.GITHUB_TOKEN_BOT;
 
 
 const githubUsers = [
-  "07calc",
-  "joYBoY1210",
-  "Pratikrkcha",
-  "BluesIsekai",
-  "23abdul23",
-  "Washiki",
-  "Shravanimath",
-  "VaidikKindaCodes",
-  "MishtiGarg250",
-  "Aryan9059",
-  "adith-nr",
-  "sankalpj47",
-  "Suvanwita",
-  "Surya-Raghuram",
-  "Paraspandey-debugs",
-  "angrycrax",
-  "Dheeraj-06",
-  "aadyagupta23",
-  "Aryan-coder06",
-  "SaqlainSQX",
-  "HGRgamer",
-  "vichanshu",
-  "Scorchedpearl",
-  "yash194",
-  "sahilgupta2006",
-  "Zonedoutdg",
-  "Rational-Idiot",
-  "bitflipper19",
-  "ShubhamKumarSahu-svg",
-  "Soham-Donode",
-  "Vinesh-27",
-  "shrmaanubhav",
-  "krichyrich",
-  "kyanmahajan",
-  "ShonWaghchoure",
-  "Jazzrahi"
+  "Naman2251",
+  "Coldesy",
+  "agarwalkrishna709-dotcom",
+  "arnavsingh010",
+  "HARSH4885-svg",
+  "0xshellghost",
+  "Shreya-Kumbar",
+  "anuragratan1",
+  "KushagraSahu-01",
+  "Apoorv-Wade",
+  "LooninS",
+  "Hkhacker22",
+  "joy9168m",
+  "shalomkar",
+  "Cosmic-voyager-as",
+  "riyaghoshi",
+  "hiyashbansal",
+  "Manas8112",
+  "mhetreyash1905-oss",
+  "abhishekbaryaiiita"
 ];
 
 async function getUserId(username) {

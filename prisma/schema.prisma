@@ -3,10 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider     = "mysql"
-  url          = env("DATABASE_URL")
+  provider          = "mysql"
+  url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
-  relationMode = "prisma"
+  relationMode      = "prisma"
 }
 
 model User {
@@ -21,11 +21,11 @@ model User {
   degree         String
   discordId      String?      @unique
   githubId       String       @unique
-  year           String       @db.VarChar(20)
-  gender         String       @default("male") @db.VarChar(20)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
+  gender         String       @default("male") @db.VarChar(20)
+  year           String       @db.VarChar(20)
   Admin          Admin?
   Participant    Participant?
 
@@ -57,10 +57,10 @@ model Event {
   description        String?
   startDate          DateTime           @default(now())
   endDate            DateTime?
-  logoImageURL       String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   deletedAt          DateTime?
+  logoImageURL       String?
   creator            Admin              @relation(fields: [creatorId], references: [userId])
   Repo               Repo[]
   LeaderBoardEntries LeaderboardEntry[]
@@ -115,11 +115,11 @@ model Repo {
   eventName     String
   name          String    @unique
   description   String?
-  isFirstYrOnly Boolean   @default(false)
-  isGirlsOnly   Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
+  isFirstYrOnly Boolean   @default(false)
+  isGirlsOnly   Boolean   @default(false)
   creator       Admin     @relation(fields: [creatorId], references: [userId])
   event         Event     @relation(fields: [eventName], references: [name])
   issues        Issue[]
@@ -131,12 +131,12 @@ model Repo {
 model Issue {
   id            String       @id @default(uuid())
   repoName      String
+  assigneeId    String?
   issueNumber   Int
   title         String
   status        IssueStatus  @default(OPEN)
   openForAll    Boolean      @default(false)
   currentPoints Int          @default(0)
-  assigneeId    String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   deletedAt     DateTime?
@@ -151,11 +151,11 @@ model Issue {
 model PR {
   id          BigInt      @id
   title       String
+  submitterId String
+  issueId     String
   prNumber    Int
   points      Int
   status      PRStatus    @default(OPENED)
-  submitterId String
-  issueId     String
   submitter   Participant @relation(fields: [submitterId], references: [participantId])
   issue       Issue       @relation(fields: [issueId], references: [id])
 
@@ -163,18 +163,33 @@ model PR {
   @@index([issueId])
 }
 
-// model LeaderboardSnapshot {
-//   id            String   @id
-//   participantId String
-//   eventName     String
-//   date          DateTime
-//   totalPoints   Int      @default(0)
-//   PRmerged      Int      @default(0)
-// 
-//   @@unique([participantId, eventName, date])
-//   @@index([eventName, date])
-//   @@index([participantId, date])
-// }
+model GC_Wallet {
+  id           String           @id @default(uuid())
+  githubId     String           @unique
+  balance      Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  transactions GC_Transaction[]
+
+  @@index([githubId])
+  @@map("gc_wallet")
+}
+
+model GC_Transaction {
+  id             String    @id @default(uuid())
+  walletId       String    @map("wallet_id")
+  githubId       String    @map("github_id")
+  amount         Int
+  eventName      String?   @map("event_name")
+  idempotencyKey String?   @map("idempotency_key")
+  createdAt      DateTime  @default(now())
+  wallet         GC_Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([githubId])
+  @@index([eventName])
+  @@map("gc_transaction")
+}
 
 enum LeaderboardEventType {
   PR_MERGED

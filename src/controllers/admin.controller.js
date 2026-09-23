@@ -569,10 +569,18 @@ const incrementPoints = async (req, res) => {
                                 name: eventName
                             }
                         },
+                        pr: {
+                            connect: {
+                                id: pr.id
+                            }
+                        },
+                        issue: {
+                            connect: {
+                                id: pr.issueId
+                            }
+                        },
                         type: 'MANUAL_ADJUSTMENT',
-                        pointsDelta: pointIncrement,
-                        prId: pr.id,
-                        issueId: pr.issueId
+                        pointsDelta: pointIncrement
                     }
                 }
             }

@@ -10,6 +10,15 @@ dotenv.config();
 //axios buggy with proxy. needs repair.
 axios.defaults.proxy = false;
 
+const setCookie = (res, token) => {
+    res.cookie('jwt', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.COOKIE_SAME_SITE || 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+};
+
 //display the auth screen where user logs in to github
 const userGitHubRedirect = async (req, res) => {
     const userAuthScreenURL = `https://github.com/login/oauth/authorize?client_id=${process.env.CLIENT_ID}&state=${process.env.STATE}&scope=read:user`;
@@ -65,6 +74,7 @@ const userTokenTransfer = async (req, res) => {
                     },
                     process.env.JWT_SECRET
                 );
+                setCookie(res, token);
                 res.redirect(
                     // if user not registered, send to register route with token.
                     // token stored in localStorage here.
@@ -116,6 +126,7 @@ const userTokenTransfer = async (req, res) => {
                         },
                         process.env.JWT_SECRET
                     );
+                    setCookie(res, token);
                     res.redirect(
                         `${
                             process.env.ADMIN_DASHBOARD_URL
@@ -133,6 +144,7 @@ const userTokenTransfer = async (req, res) => {
                         },
                         process.env.JWT_SECRET
                     );
+                    setCookie(res, token);
                     res.redirect(
                         `${
                             process.env.USER_DASHBOARD_URL

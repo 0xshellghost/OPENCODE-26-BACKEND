@@ -2,6 +2,7 @@ import express from 'express';
 import {
     participantIssues,
     getPRdetails,
+    getPRPoints,
     getParticipant,
     loggedInParticipantDetails
 } from '../../controllers/participant.controller.js';
@@ -12,6 +13,7 @@ const participantRouter = express.Router();
 participantRouter.get('/',userAuth,loggedInParticipantDetails);
 participantRouter.get('/:participantId/:eventName', getParticipant);
 participantRouter.get('/:participantId/:eventName/issues', participantIssues); //repo id as query param
+participantRouter.get('/:participantId/pr-points', getPRPoints);
 participantRouter.get('/:githubId/:eventName/pr', getPRdetails);
 
 export default participantRouter;

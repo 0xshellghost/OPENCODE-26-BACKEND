@@ -182,6 +182,37 @@ const getPRdetails = async (req, res) => {
     }
 };
 
+const getPRPoints = async (req, res) => {
+    try {
+        const { participantId } = req.params;
+        const participant = await prisma.participant.findUnique({
+            where: {
+                participantId
+            },
+            select: {
+                PR: {
+                    select: {
+                        points: true
+                    }
+                }
+            }
+        });
+
+        if (!participant) {
+            return response_404(res, 'User not found');
+        }
+
+        return response_200(
+            res,
+            'Success',
+            participant.PR.reduce((total, { points }) => total + points, 0)
+        );
+    } catch (error) {
+        console.error(error);
+        response_500(res, 'Error while fetching PR points', error);
+    }
+};
+
 const registerParticipantForEvent = async (req, res) => {
     try {
         const { eventName } = req.query;
@@ -297,6 +328,7 @@ const loggedInParticipantDetails = async (req, res) => {
 export {
     participantIssues,
     getPRdetails,
+    getPRPoints,
     getParticipant,
     registerParticipantForEvent,
     loggedInParticipantDetails

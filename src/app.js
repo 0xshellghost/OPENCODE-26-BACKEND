@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import router from './routes/index.js';
 import { connDB } from './config/db.config.js';
 // import { startLeaderboardSnapshotJob } from "./jobs/leaderboardSnapshot.job.js";
@@ -10,7 +11,9 @@ import { startBackupCron } from './jobs/backupCron.job.js';
 dotenv.config();
 const app = express();
 connDB();
-app.use(cors());
+
+app.use(cors({ origin: true, credentials: true }));
+app.use(cookieParser());
 app.use(express.json());  
 app.use(express.urlencoded({ extended: true }));
 

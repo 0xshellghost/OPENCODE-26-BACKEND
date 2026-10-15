@@ -10,12 +10,11 @@ import userAuth from '../../middlewares/userAuth.middleware.js';
 
 const participantRouter = express.Router();
 
-participantRouter.get('/',userAuth,loggedInParticipantDetails);
+participantRouter.get('/', userAuth, loggedInParticipantDetails);
 participantRouter.get('/:participantId/:eventName', getParticipant);
 participantRouter.get('/:participantId/:eventName/issues', participantIssues); //repo id as query param
 participantRouter.get('/:participantId/pr-points', getPRPoints);
 participantRouter.get('/:githubId/:eventName/pr', getPRdetails);
+participantRouter.put('/update', userAuth);
 
 export default participantRouter;
-
-

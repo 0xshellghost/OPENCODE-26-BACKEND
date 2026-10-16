@@ -5,6 +5,7 @@ import mysql from 'mysql2/promise';
 import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
+import zlib from 'zlib';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -117,7 +118,6 @@ async function main() {
     // Detect gzip
     if (decodedBuf.length >= 2 && decodedBuf[0] === 0x1f && decodedBuf[1] === 0x8b) {
       console.log('SQL file appears gzipped; decompressing...');
-      const zlib = require('zlib');
       decodedBuf = zlib.gunzipSync(decodedBuf);
     }
 

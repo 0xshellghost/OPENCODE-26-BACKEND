@@ -1,6 +1,7 @@
 import prisma from '../config/db.config.js';
 import {
     response_200,
+    response_400,
     response_404,
     response_500
 } from '../utils/responseCodes.js';
@@ -52,6 +53,10 @@ const getParticipant = async (req, res) => {
             }
         });
 
+        if (!participant) {
+            return response_404(res, 'Participant not found');
+        }
+
         const leaderboard = await prisma.leaderboardEntry.findMany({
             //Major WorkAround, in future if multiple events are hosted than it Needs To be
             //used as 'participantId_eventName' as one participant can be in many Events
@@ -59,14 +64,13 @@ const getParticipant = async (req, res) => {
             where: {
                 participantId: participantId
             },
-        })
-
+        });
 
         const formattedData = {
             ...participant.User,
             PR: participant.PR,
-            points: leaderboard[0].points,
-            prMerged: leaderboard[0].PRmerged,
+            points: leaderboard[0]?.points ?? 0,
+            prMerged: leaderboard[0]?.PRmerged ?? 0,
         };
 
         return response_200(res, 'OK', formattedData);
@@ -325,11 +329,81 @@ const loggedInParticipantDetails = async (req, res) => {
     }
 };
 
+const updateParticipantProfile = async (req, res) => {
+    try {
+        const githubId = req.user.id;
+        const {
+            name,
+            college,
+            discordId,
+            gender,
+            year,
+            branch,
+            degree,
+            graduationYear,
+            avatarUrl
+        } = req.body;
+
+        const user = await prisma.user.findUnique({
+            where: { githubId }
+        });
+
+        if (!user) {
+            return response_404(res, 'User not found');
+        }
+
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (college !== undefined) updateData.college = college;
+        if (gender !== undefined) updateData.gender = gender;
+        if (year !== undefined) updateData.year = String(year);
+        if (branch !== undefined) updateData.branch = branch;
+        if (degree !== undefined) updateData.degree = degree;
+        if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+        if (graduationYear !== undefined && graduationYear !== null && graduationYear !== '') {
+            updateData.graduationYear = Number(graduationYear);
+        }
+
+        if (discordId !== undefined) {
+            const trimmedDiscord = typeof discordId === 'string' ? discordId.trim() : discordId;
+            const finalDiscord = trimmedDiscord === '' ? null : trimmedDiscord;
+
+            if (finalDiscord) {
+                const existingUserWithDiscord = await prisma.user.findFirst({
+                    where: {
+                        discordId: finalDiscord,
+                        NOT: { githubId }
+                    }
+                });
+                if (existingUserWithDiscord) {
+                    return response_400(res, 'Discord ID is already in use by another user');
+                }
+            }
+            updateData.discordId = finalDiscord;
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { githubId },
+            data: updateData
+        });
+
+        return response_200(res, 'Profile updated successfully', updatedUser);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            const target = error.meta?.target;
+            return response_400(res, `${target || 'Field'} is already in use`);
+        }
+        console.error(error);
+        return response_500(res, 'Error while updating profile', error);
+    }
+};
+
 export {
     participantIssues,
     getPRdetails,
     getPRPoints,
     getParticipant,
     registerParticipantForEvent,
-    loggedInParticipantDetails
+    loggedInParticipantDetails,
+    updateParticipantProfile
 };

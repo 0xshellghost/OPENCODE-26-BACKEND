@@ -95,6 +95,7 @@ All routes below are under `/api/v1`.
 
 ### Participant / Profile
 - `GET /participant/` : Logged-in participant details (requires auth)
+- `PUT /participant/update` : Update logged-in participant profile (requires auth)
 - `GET /participant/:participantId/:eventName` : Participant profile by GitHub ID + event
 - `GET /participant/:participantId/:eventName/issues?repoName=...` : Participant issues for event (repo filtered)
 - `GET /participant/:githubId/:eventName/pr` : Participant PR details (admin view)

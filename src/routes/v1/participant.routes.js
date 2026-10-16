@@ -20,5 +20,3 @@ participantRouter.get('/:participantId/pr-points', getPRPoints);
 participantRouter.get('/:githubId/:eventName/pr', getPRdetails);
 
 export default participantRouter;
-
-

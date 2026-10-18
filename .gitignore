@@ -1,0 +1,9 @@
+/learnings
+/node_modules
+.env
+/.vscode
+TODO.md
+DB_BACKUPS
+
+*.tmp
+.DS_Store

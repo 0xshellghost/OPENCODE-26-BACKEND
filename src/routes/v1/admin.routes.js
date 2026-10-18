@@ -8,10 +8,11 @@ import {
     getAllReposOfEvent,
     incrementPoints,
     getEvents,
+    uploadLeaderboard,
     addAdmin
 } from '../../controllers/admin.controller.js';
 import { participantIssues } from '../../controllers/participant.controller.js';
-import { eventUploader } from '../../middlewares/imageUpload.middleware.js';
+import { eventUploader, fileUploader } from '../../middlewares/imageUpload.middleware.js';
 
 const router = express.Router();
 
@@ -37,4 +38,8 @@ router.patch('/modify/', incrementPoints);
 //view issues of any participant across an event (or a repo within an event)
 
 router.get('/:eventName/:participantId/issues', participantIssues); //repo id as query param
+
+// Upload event leaderboard from spreadsheet (Excel / CSV)
+router.post('/event/:eventName/leaderboard/upload', fileUploader, uploadLeaderboard);
+
 export default router;

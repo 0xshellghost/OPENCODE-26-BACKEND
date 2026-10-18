@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 // import { PRStatus } from '@prisma/client';
 import prisma from '../config/db.config.js';
 import { getRepoDetails } from '../utils/getRepoDetails.js';
@@ -585,6 +586,137 @@ const incrementPoints = async (req, res) => {
     }
 };
 
+
+const uploadLeaderboard = async (req, res) => {
+    try {
+        const { eventName } = req.params;
+
+        if (!eventName) {
+            return response_400(res, 'Event name is required');
+        }
+
+        const event = await prisma.event.findUnique({
+            where: { name: eventName }
+        });
+
+        if (!event) {
+            return response_404(res, 'Event "' + eventName + '" not found');
+        }
+
+        if (!req.file || !req.file.buffer) {
+            return response_400(res, 'No spreadsheet file uploaded. Please upload a .csv or .xlsx file.');
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+            return response_400(res, 'The uploaded spreadsheet contains no sheets.');
+        }
+
+        const firstSheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[firstSheetName];
+        const rawRows = XLSX.utils.sheet_to_json(sheet);
+
+        if (!rawRows || rawRows.length === 0) {
+            return response_400(res, 'The spreadsheet is empty or has no data rows.');
+        }
+
+        const getRowValue = (row, possibleKeys) => {
+            for (const key of Object.keys(row)) {
+                const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                for (const expected of possibleKeys) {
+                    if (cleanKey === expected) {
+                        return row[key];
+                    }
+                }
+            }
+            return undefined;
+        };
+
+        let processedCount = 0;
+
+        for (const row of rawRows) {
+            const rawGithubId = getRowValue(row, ['githubusername', 'githubid', 'github', 'username']);
+            const githubId = String(rawGithubId || '').trim();
+
+            if (!githubId) {
+                continue;
+            }
+
+            const rawName = getRowValue(row, ['name', 'fullname', 'participantname', 'participant']);
+            const name = String(rawName || githubId).trim();
+
+            const rawPoints = getRowValue(row, ['points', 'point', 'score', 'pts']);
+            const points = parseInt(rawPoints, 10) || 0;
+
+            const rawCollege = getRowValue(row, ['college', 'collegename', 'university', 'institute']);
+            const college = String(rawCollege || 'IIIT Allahabad').trim();
+
+            const rawGradYear = parseInt(getRowValue(row, ['graduationyear', 'gradyear', 'year', 'batch']), 10);
+            const graduationYear = !Number.isNaN(rawGradYear) && rawGradYear >= 2000 && rawGradYear <= 2100 ? rawGradYear : 2027;
+
+            const branch = String(getRowValue(row, ['branch', 'department']) || 'N/A').trim();
+            const degree = String(getRowValue(row, ['degree', 'course']) || 'N/A').trim();
+            const year = String(getRowValue(row, ['currentyear', 'studyingyear']) || 'N/A').trim();
+
+            await prisma.user.upsert({
+                where: { githubId },
+                update: {
+                    name,
+                    college,
+                    graduationYear,
+                    avatarUrl: 'https://avatars.githubusercontent.com/' + githubId
+                },
+                create: {
+                    name,
+                    email: githubId + '@users.noreply.github.com',
+                    githubId,
+                    avatarUrl: 'https://avatars.githubusercontent.com/' + githubId,
+                    college,
+                    graduationYear,
+                    branch,
+                    degree,
+                    year
+                }
+            });
+
+            await prisma.participant.upsert({
+                where: { participantId: githubId },
+                update: {},
+                create: { participantId: githubId }
+            });
+
+            await prisma.leaderboardEntry.upsert({
+                where: {
+                    participantId_eventName: {
+                        participantId: githubId,
+                        eventName
+                    }
+                },
+                update: {
+                    points,
+                    PRmerged: 0
+                },
+                create: {
+                    participantId: githubId,
+                    eventName,
+                    points,
+                    PRmerged: 0
+                }
+            });
+
+            processedCount++;
+        }
+
+        return response_200(res, 'Leaderboard updated successfully with ' + processedCount + ' participants.', {
+            eventName,
+            participantCount: processedCount
+        });
+    } catch (error) {
+        console.error('Error uploading leaderboard:', error);
+        return response_500(res, 'Error while uploading leaderboard spreadsheet', error);
+    }
+};
+
 export {
     createEvent,
     deleteEvent,
@@ -594,5 +726,6 @@ export {
     deleteRepo,
     renameRepo,
     getAllReposOfEvent,
-    incrementPoints
+    incrementPoints,
+    uploadLeaderboard
 };

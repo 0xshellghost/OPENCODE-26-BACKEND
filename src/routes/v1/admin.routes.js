@@ -39,7 +39,7 @@ router.patch('/modify/', incrementPoints);
 
 router.get('/:eventName/:participantId/issues', participantIssues); //repo id as query param
 
-// Upload event leaderboard from spreadsheet (Excel / CSV)
+// Upload event leaderboard from SQL script
 router.post('/event/:eventName/leaderboard/upload', fileUploader, uploadLeaderboard);
 
 export default router;

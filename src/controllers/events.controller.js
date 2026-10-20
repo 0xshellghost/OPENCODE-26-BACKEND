@@ -142,9 +142,11 @@ const getLeaderboard = async (req, res) => {
         let lastRank = null;
         let rankCounter = 0;
         const formattedLeaderboard = leaderboardOfEvent.map((entry) => {
+            const user = entry.Participant?.User;
+            const createdAtTime = user?.createdAt ? new Date(user.createdAt).getTime() : 0;
             const rank = [
-                entry.points,
-                entry.Participant.User.createdAt.getTime()
+                entry.points ?? 0,
+                createdAtTime
             ];
             if (
                 lastRank === null ||
@@ -153,16 +155,17 @@ const getLeaderboard = async (req, res) => {
                 rankCounter += 1;
                 lastRank = rank;
             }
+            const githubId = user?.githubId || entry.participantId;
             return {
                 position: rankCounter,
-                name: entry.Participant.User.name,
-                githubid: entry.Participant.User.githubId,
-                prmerged: entry.PRmerged,
-                points: entry.points,
-                avatarUrl: entry.Participant.User.avatarUrl,
-                collegeName: entry.Participant.User.college,
-                graduationYear: entry.Participant.User.graduationYear
-                // prDetailsURL: `${process.env.BACKEND_URL}/api/v1/participant/${entry.Participant.User.githubId}/${req.params.eventName}/pr`
+                name: user?.name || githubId,
+                githubid: githubId,
+                prmerged: entry.PRmerged ?? 0,
+                points: entry.points ?? 0,
+                avatarUrl: user?.avatarUrl || `https://avatars.githubusercontent.com/${githubId}`,
+                collegeName: user?.college || 'N/A',
+                graduationYear: user?.graduationYear || ''
+                // prDetailsURL: `${process.env.BACKEND_URL}/api/v1/participant/${githubId}/${req.params.eventName}/pr`
             };
         });
         return response_200(res,'OK',formattedLeaderboard);

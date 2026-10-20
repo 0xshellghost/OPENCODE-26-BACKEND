@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import mysql from 'mysql2/promise';
 // import { PRStatus } from '@prisma/client';
 import prisma from '../config/db.config.js';
 import { getRepoDetails } from '../utils/getRepoDetails.js';
@@ -595,6 +595,11 @@ const uploadLeaderboard = async (req, res) => {
             return response_400(res, 'Event name is required');
         }
 
+        // Opencode leaderboard is live and automated via GitHub bot PRs/issues
+        if (eventName.toLowerCase().includes('opencode')) {
+            return response_400(res, 'Leaderboard upload via SQL is not permitted for Opencode because its leaderboard is live and automated.');
+        }
+
         const event = await prisma.event.findUnique({
             where: { name: eventName }
         });
@@ -604,78 +609,91 @@ const uploadLeaderboard = async (req, res) => {
         }
 
         if (!req.file || !req.file.buffer) {
-            return response_400(res, 'No spreadsheet file uploaded. Please upload a .csv or .xlsx file.');
+            return response_400(res, 'No SQL file uploaded. Please upload a .sql file.');
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-            return response_400(res, 'The uploaded spreadsheet contains no sheets.');
+        if (req.file.originalname && !req.file.originalname.toLowerCase().endsWith('.sql')) {
+            return response_400(res, 'Invalid file type. Please upload a .sql file.');
         }
 
-        const firstSheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[firstSheetName];
-        const rawRows = XLSX.utils.sheet_to_json(sheet);
-
-        if (!rawRows || rawRows.length === 0) {
-            return response_400(res, 'The spreadsheet is empty or has no data rows.');
+        let fileBuf = req.file.buffer;
+        let sql;
+        if (fileBuf.length >= 3 && fileBuf[0] === 0xef && fileBuf[1] === 0xbb && fileBuf[2] === 0xbf) {
+            sql = fileBuf.toString('utf8').replace(/^\uFEFF/, '');
+        } else if (fileBuf.length >= 2 && fileBuf[0] === 0xff && fileBuf[1] === 0xfe) {
+            sql = fileBuf.toString('utf16le');
+        } else {
+            sql = fileBuf.toString('utf8');
         }
 
-        const getRowValue = (row, possibleKeys) => {
-            for (const key of Object.keys(row)) {
-                const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-                for (const expected of possibleKeys) {
-                    if (cleanKey === expected) {
-                        return row[key];
-                    }
-                }
-            }
-            return undefined;
+        sql = sql.trim();
+        if (!sql) {
+            return response_400(res, 'The uploaded SQL file is empty.');
+        }
+
+        // Prevent destructive system operations
+        const destructiveRegex = /\b(DROP\s+DATABASE|DROP\s+TABLE|ALTER\s+USER|GRANT\s+|REVOKE\s+|SHUTDOWN)\b/i;
+        if (destructiveRegex.test(sql)) {
+            return response_400(res, 'SQL file contains disallowed destructive statements (e.g. DROP DATABASE, DROP TABLE).');
+        }
+
+        const databaseUrl = process.env.DATABASE_URL;
+        if (!databaseUrl) {
+            return response_500(res, 'DATABASE_URL configuration is missing on server.');
+        }
+
+        const url = new URL(databaseUrl);
+        const database = url.pathname ? url.pathname.replace(/^\//, '') : undefined;
+        const sslMode = url.searchParams.get('ssl-mode');
+
+        const dbConfig = {
+            host: url.hostname,
+            port: url.port ? Number(url.port) : 3306,
+            user: decodeURIComponent(url.username),
+            password: decodeURIComponent(url.password),
+            database,
+            multipleStatements: true
         };
 
-        let processedCount = 0;
+        if (sslMode && sslMode.toUpperCase() === 'REQUIRED') {
+            dbConfig.ssl = { rejectUnauthorized: false };
+        }
 
-        for (const row of rawRows) {
-            const rawGithubId = getRowValue(row, ['githubusername', 'githubid', 'github', 'username']);
-            const githubId = String(rawGithubId || '').trim();
+        const conn = await mysql.createConnection(dbConfig);
+        try {
+            await conn.query(sql);
+        } catch (sqlErr) {
+            console.error('SQL Execution Error:', sqlErr);
+            return response_400(res, 'Failed to execute SQL: ' + (sqlErr.sqlMessage || sqlErr.message));
+        } finally {
+            try {
+                await conn.end();
+            } catch {}
+        }
 
-            if (!githubId) {
-                continue;
-            }
+        // Integrity pass: ensure every LeaderboardEntry for this event has corresponding User & Participant records
+        const entries = await prisma.leaderboardEntry.findMany({
+            where: { eventName },
+            select: { participantId: true }
+        });
 
-            const rawName = getRowValue(row, ['name', 'fullname', 'participantname', 'participant']);
-            const name = String(rawName || githubId).trim();
-
-            const rawPoints = getRowValue(row, ['points', 'point', 'score', 'pts']);
-            const points = parseInt(rawPoints, 10) || 0;
-
-            const rawCollege = getRowValue(row, ['college', 'collegename', 'university', 'institute']);
-            const college = String(rawCollege || 'IIIT Allahabad').trim();
-
-            const rawGradYear = parseInt(getRowValue(row, ['graduationyear', 'gradyear', 'year', 'batch']), 10);
-            const graduationYear = !Number.isNaN(rawGradYear) && rawGradYear >= 2000 && rawGradYear <= 2100 ? rawGradYear : 2027;
-
-            const branch = String(getRowValue(row, ['branch', 'department']) || 'N/A').trim();
-            const degree = String(getRowValue(row, ['degree', 'course']) || 'N/A').trim();
-            const year = String(getRowValue(row, ['currentyear', 'studyingyear']) || 'N/A').trim();
+        for (const entry of entries) {
+            const githubId = entry.participantId;
+            if (!githubId) continue;
 
             await prisma.user.upsert({
                 where: { githubId },
-                update: {
-                    name,
-                    college,
-                    graduationYear,
-                    avatarUrl: 'https://avatars.githubusercontent.com/' + githubId
-                },
+                update: {},
                 create: {
-                    name,
-                    email: githubId + '@users.noreply.github.com',
+                    name: githubId,
+                    email: `${githubId}@users.noreply.github.com`,
                     githubId,
                     avatarUrl: 'https://avatars.githubusercontent.com/' + githubId,
-                    college,
-                    graduationYear,
-                    branch,
-                    degree,
-                    year
+                    college: 'IIIT Allahabad',
+                    graduationYear: 2027,
+                    branch: 'N/A',
+                    degree: 'N/A',
+                    year: 'N/A'
                 }
             });
 
@@ -684,36 +702,19 @@ const uploadLeaderboard = async (req, res) => {
                 update: {},
                 create: { participantId: githubId }
             });
-
-            await prisma.leaderboardEntry.upsert({
-                where: {
-                    participantId_eventName: {
-                        participantId: githubId,
-                        eventName
-                    }
-                },
-                update: {
-                    points,
-                    PRmerged: 0
-                },
-                create: {
-                    participantId: githubId,
-                    eventName,
-                    points,
-                    PRmerged: 0
-                }
-            });
-
-            processedCount++;
         }
 
-        return response_200(res, 'Leaderboard updated successfully with ' + processedCount + ' participants.', {
+        const totalEntries = await prisma.leaderboardEntry.count({
+            where: { eventName }
+        });
+
+        return response_200(res, `Leaderboard SQL executed successfully for event "${eventName}". Found ${totalEntries} participant(s).`, {
             eventName,
-            participantCount: processedCount
+            participantCount: totalEntries
         });
     } catch (error) {
-        console.error('Error uploading leaderboard:', error);
-        return response_500(res, 'Error while uploading leaderboard spreadsheet', error);
+        console.error('Error uploading leaderboard SQL:', error);
+        return response_500(res, 'Error while uploading and executing leaderboard SQL', error);
     }
 };
 

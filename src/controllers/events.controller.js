@@ -14,7 +14,12 @@ const getAllEvents = async (req, res) => {
                 description: true,
                 startDate: true,
                 endDate: true,
-                deletedAt: true
+                deletedAt: true,
+                coverImagesURL: {
+                    select: {
+                        url: true
+                    }
+                }
             }
         });
 
@@ -110,10 +115,13 @@ const getRepoOfEvent = async (req, res) => {
 
 const getLeaderboard = async (req, res) => {
     try {
-        //This gets all the leaderboardEntries of the event
+        const { eventName } = req.params;
+        const isOpencode = (eventName || '').toLowerCase().includes('opencode');
+
+        // Fetch all leaderboard entries of the requested event
         const leaderboardOfEvent = await prisma.leaderboardEntry.findMany({
             where: {
-                eventName: req.params.eventName
+                eventName: eventName
             },
             include: {
                 Participant: {
@@ -138,37 +146,81 @@ const getLeaderboard = async (req, res) => {
             ]
         });
 
-        // Deterministic ordering + dense ranking for stable ties
+        if (!leaderboardOfEvent || leaderboardOfEvent.length === 0) {
+            return response_200(res, 'OK', []);
+        }
+
+        // Determine if this event tracks points or is only rank & name.
+        // OpenCode always has points and PR counts.
+        // Other events only include points if points are actively tracked,
+        // or if specified via query param.
+        const explicitNoPoints = req.query.hasPoints === 'false' || req.query.type === 'rank_only';
+        const hasRecordedPoints = leaderboardOfEvent.some(
+            (entry) => entry.points !== null && entry.points !== undefined && Number(entry.points) > 0
+        ) && !leaderboardOfEvent.every(
+            (entry, index) => Number(entry.points) === index + 1
+        );
+        const hasPoints = isOpencode || (req.query.hasPoints === 'true' || (!explicitNoPoints && hasRecordedPoints));
+
         let lastRank = null;
         let rankCounter = 0;
-        const formattedLeaderboard = leaderboardOfEvent.map((entry) => {
+
+        const formattedLeaderboard = leaderboardOfEvent.map((entry, index) => {
             const user = entry.Participant?.User;
             const createdAtTime = user?.createdAt ? new Date(user.createdAt).getTime() : 0;
-            const rank = [
-                entry.points ?? 0,
-                createdAtTime
-            ];
-            if (
-                lastRank === null ||
-                rank.some((value, index) => value !== lastRank[index])
-            ) {
-                rankCounter += 1;
-                lastRank = rank;
-            }
             const githubId = user?.githubId || entry.participantId;
+            const name = user?.name || githubId;
+            const avatarUrl = user?.avatarUrl || (githubId ? `https://avatars.githubusercontent.com/${githubId}` : null);
+            const collegeName = user?.college || 'N/A';
+            const graduationYear = user?.graduationYear || '';
+
+            // 1. OpenCode: contains Rank, Name, github Id, PRs Merged, and Points
+            if (isOpencode) {
+                const rank = [entry.points ?? 0, createdAtTime];
+                if (lastRank === null || rank.some((value, idx) => value !== lastRank[idx])) {
+                    rankCounter += 1;
+                    lastRank = rank;
+                }
+                return {
+                    position: rankCounter,
+                    name,
+                    githubid: githubId,
+                    prmerged: entry.PRmerged ?? 0,
+                    points: entry.points ?? 0,
+                    avatarUrl,
+                    collegeName,
+                    graduationYear
+                };
+            }
+
+            // 2. Other events with points: contain Rank, Name, and Points
+            if (hasPoints) {
+                const rank = [entry.points ?? 0, createdAtTime];
+                if (lastRank === null || rank.some((value, idx) => value !== lastRank[idx])) {
+                    rankCounter += 1;
+                    lastRank = rank;
+                }
+                return {
+                    position: rankCounter,
+                    name,
+                    points: entry.points ?? 0,
+                    avatarUrl,
+                    collegeName,
+                    graduationYear
+                };
+            }
+
+            // 3. Events with only Name and Rank
             return {
-                position: rankCounter,
-                name: user?.name || githubId,
-                githubid: githubId,
-                prmerged: entry.PRmerged ?? 0,
-                points: entry.points ?? 0,
-                avatarUrl: user?.avatarUrl || `https://avatars.githubusercontent.com/${githubId}`,
-                collegeName: user?.college || 'N/A',
-                graduationYear: user?.graduationYear || ''
-                // prDetailsURL: `${process.env.BACKEND_URL}/api/v1/participant/${githubId}/${req.params.eventName}/pr`
+                position: index + 1,
+                name,
+                avatarUrl,
+                collegeName,
+                graduationYear
             };
         });
-        return response_200(res,'OK',formattedLeaderboard);
+
+        return response_200(res, 'OK', formattedLeaderboard);
     } catch (error) {
         response_500(res, 'Error', error);
     }

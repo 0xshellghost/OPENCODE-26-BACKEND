@@ -13,3 +13,4 @@ export const eventUploader = upload.fields([
         maxCount: 5
     }
 ]);
+export const fileUploader = upload.single('file');

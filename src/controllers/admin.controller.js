@@ -1,3 +1,4 @@
+import mysql from 'mysql2/promise';
 // import { PRStatus } from '@prisma/client';
 import prisma from '../config/db.config.js';
 import { getRepoDetails } from '../utils/getRepoDetails.js';
@@ -585,6 +586,138 @@ const incrementPoints = async (req, res) => {
     }
 };
 
+
+const uploadLeaderboard = async (req, res) => {
+    try {
+        const { eventName } = req.params;
+
+        if (!eventName) {
+            return response_400(res, 'Event name is required');
+        }
+
+        // Opencode leaderboard is live and automated via GitHub bot PRs/issues
+        if (eventName.toLowerCase().includes('opencode')) {
+            return response_400(res, 'Leaderboard upload via SQL is not permitted for Opencode because its leaderboard is live and automated.');
+        }
+
+        const event = await prisma.event.findUnique({
+            where: { name: eventName }
+        });
+
+        if (!event) {
+            return response_404(res, 'Event "' + eventName + '" not found');
+        }
+
+        if (!req.file || !req.file.buffer) {
+            return response_400(res, 'No SQL file uploaded. Please upload a .sql file.');
+        }
+
+        if (req.file.originalname && !req.file.originalname.toLowerCase().endsWith('.sql')) {
+            return response_400(res, 'Invalid file type. Please upload a .sql file.');
+        }
+
+        let fileBuf = req.file.buffer;
+        let sql;
+        if (fileBuf.length >= 3 && fileBuf[0] === 0xef && fileBuf[1] === 0xbb && fileBuf[2] === 0xbf) {
+            sql = fileBuf.toString('utf8').replace(/^\uFEFF/, '');
+        } else if (fileBuf.length >= 2 && fileBuf[0] === 0xff && fileBuf[1] === 0xfe) {
+            sql = fileBuf.toString('utf16le');
+        } else {
+            sql = fileBuf.toString('utf8');
+        }
+
+        sql = sql.trim();
+        if (!sql) {
+            return response_400(res, 'The uploaded SQL file is empty.');
+        }
+
+        // Prevent destructive system operations
+        const destructiveRegex = /\b(DROP\s+DATABASE|DROP\s+TABLE|ALTER\s+USER|GRANT\s+|REVOKE\s+|SHUTDOWN)\b/i;
+        if (destructiveRegex.test(sql)) {
+            return response_400(res, 'SQL file contains disallowed destructive statements (e.g. DROP DATABASE, DROP TABLE).');
+        }
+
+        const databaseUrl = process.env.DATABASE_URL;
+        if (!databaseUrl) {
+            return response_500(res, 'DATABASE_URL configuration is missing on server.');
+        }
+
+        const url = new URL(databaseUrl);
+        const database = url.pathname ? url.pathname.replace(/^\//, '') : undefined;
+        const sslMode = url.searchParams.get('ssl-mode');
+
+        const dbConfig = {
+            host: url.hostname,
+            port: url.port ? Number(url.port) : 3306,
+            user: decodeURIComponent(url.username),
+            password: decodeURIComponent(url.password),
+            database,
+            multipleStatements: true
+        };
+
+        if (sslMode && sslMode.toUpperCase() === 'REQUIRED') {
+            dbConfig.ssl = { rejectUnauthorized: false };
+        }
+
+        const conn = await mysql.createConnection(dbConfig);
+        try {
+            await conn.query(sql);
+        } catch (sqlErr) {
+            console.error('SQL Execution Error:', sqlErr);
+            return response_400(res, 'Failed to execute SQL: ' + (sqlErr.sqlMessage || sqlErr.message));
+        } finally {
+            try {
+                await conn.end();
+            } catch {}
+        }
+
+        // Integrity pass: ensure every LeaderboardEntry for this event has corresponding User & Participant records
+        const entries = await prisma.leaderboardEntry.findMany({
+            where: { eventName },
+            select: { participantId: true }
+        });
+
+        for (const entry of entries) {
+            const githubId = entry.participantId;
+            if (!githubId) continue;
+
+            await prisma.user.upsert({
+                where: { githubId },
+                update: {},
+                create: {
+                    name: githubId,
+                    email: `${githubId}@users.noreply.github.com`,
+                    githubId,
+                    avatarUrl: 'https://avatars.githubusercontent.com/' + githubId,
+                    college: 'IIIT Allahabad',
+                    graduationYear: 2027,
+                    branch: 'N/A',
+                    degree: 'N/A',
+                    year: 'N/A'
+                }
+            });
+
+            await prisma.participant.upsert({
+                where: { participantId: githubId },
+                update: {},
+                create: { participantId: githubId }
+            });
+        }
+
+        const totalEntries = await prisma.leaderboardEntry.count({
+            where: { eventName }
+        });
+
+        return response_200(res, `Leaderboard SQL executed successfully for event "${eventName}". Found ${totalEntries} participant(s).`, {
+            eventName,
+            participantCount: totalEntries
+        });
+    } catch (error) {
+        console.error('Error uploading leaderboard SQL:', error);
+        return response_500(res, 'Error while uploading and executing leaderboard SQL', error);
+    }
+};
+
 export {
     createEvent,
     deleteEvent,
@@ -594,5 +727,6 @@ export {
     deleteRepo,
     renameRepo,
     getAllReposOfEvent,
-    incrementPoints
+    incrementPoints,
+    uploadLeaderboard
 };

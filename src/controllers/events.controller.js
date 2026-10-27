@@ -15,6 +15,7 @@ const getAllEvents = async (req, res) => {
                 startDate: true,
                 endDate: true,
                 deletedAt: true,
+                isFlagship: true,
                 coverImagesURL: {
                     select: {
                         url: true
@@ -41,6 +42,7 @@ const getEvent = async (req, res) => {
                 description: true,
                 startDate: true,
                 endDate: true,
+                isFlagship: true,
                 coverImagesURL: {
                     select: {
                         url: true

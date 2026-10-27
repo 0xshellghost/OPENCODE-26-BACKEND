@@ -159,6 +159,63 @@ const deleteEvent = async (req, res) => {
     }
 };
 
+const setFlagshipEvent = async (req, res) => {
+    try {
+        let { eventName } = req.params;
+        if (!eventName) {
+            return response_400(res, 'Event name is required');
+        }
+
+        try {
+            eventName = decodeURIComponent(eventName);
+        } catch {}
+
+        const isFlagship = req.body.isFlagship !== undefined ? Boolean(req.body.isFlagship) : true;
+
+        const event = await prisma.event.findFirst({
+            where: {
+                name: eventName,
+                deletedAt: null
+            }
+        });
+
+        if (!event) {
+            return response_404(res, `Event "${eventName}" not found`);
+        }
+
+        if (isFlagship) {
+            await prisma.$transaction([
+                prisma.event.updateMany({
+                    where: { isFlagship: true },
+                    data: { isFlagship: false }
+                }),
+                prisma.event.update({
+                    where: { id: event.id },
+                    data: { isFlagship: true }
+                })
+            ]);
+
+            return response_200(res, `Event "${eventName}" set as flagship successfully`, {
+                name: eventName,
+                isFlagship: true
+            });
+        } else {
+            await prisma.event.update({
+                where: { id: event.id },
+                data: { isFlagship: false }
+            });
+
+            return response_200(res, `Flagship status removed from "${eventName}"`, {
+                name: eventName,
+                isFlagship: false
+            });
+        }
+    } catch (error) {
+        console.error('Error setting flagship event:', error);
+        return response_500(res, 'Error while updating flagship event', error);
+    }
+};
+
 const getEvents = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -1046,6 +1103,7 @@ const uploadLeaderboard = async (req, res) => {
 export {
     createEvent,
     deleteEvent,
+    setFlagshipEvent,
     getEvents,
     addAdmin,
     addRepo,

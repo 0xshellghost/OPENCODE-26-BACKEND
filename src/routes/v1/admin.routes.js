@@ -6,6 +6,7 @@ import {
     updateRepoDetails,
     createEvent,
     deleteEvent,
+    setFlagshipEvent,
     getAllReposOfEvent,
     incrementPoints,
     getEvents,
@@ -19,6 +20,10 @@ import { participantIssues } from '../../controllers/participant.controller.js';
 import { eventUploader, fileUploader } from '../../middlewares/imageUpload.middleware.js';
 
 const router = express.Router();
+
+// Flagship Event Routes
+router.put('/events/:eventName/flagship', setFlagshipEvent);
+router.put('/event/:eventName/flagship', setFlagshipEvent);
 
 // Mentor Management Routes
 router.get('/mentors', getAllMentors);

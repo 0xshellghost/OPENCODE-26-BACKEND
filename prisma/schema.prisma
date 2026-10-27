@@ -62,6 +62,7 @@ model Event {
   updatedAt          DateTime           @updatedAt
   deletedAt          DateTime?
   logoImageURL       String?
+  isFlagship         Boolean            @default(false)
   creator            Admin              @relation(fields: [creatorId], references: [userId])
   Repo               Repo[]
   LeaderBoardEntries LeaderboardEntry[]

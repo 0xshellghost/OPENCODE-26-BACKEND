@@ -17,6 +17,14 @@ app.use(cookieParser());
 app.use(express.json());  
 app.use(express.urlencoded({ extended: true }));
 
+// Normalize double slashes in incoming request paths (e.g. //api/v1 -> /api/v1)
+app.use((req, res, next) => {
+    if (req.url.startsWith('//')) {
+        req.url = req.url.replace(/^\/+/, '/');
+    }
+    next();
+});
+
 app.use('/api', router);
 
 const port = process.env.PORT || 4000;

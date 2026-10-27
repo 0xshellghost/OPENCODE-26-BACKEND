@@ -12,6 +12,7 @@ datasource db {
 model User {
   id             String       @id @default(uuid())
   isAdmin        Boolean      @default(false)
+  isMentor       Boolean      @default(false)
   name           String       @db.VarChar(255)
   email          String       @unique
   avatarUrl      String
@@ -115,6 +116,9 @@ model Repo {
   eventName     String
   name          String    @unique
   description   String?
+  tags          String?   @db.Text
+  language      String?   @db.VarChar(100)
+  mentors       String?   @db.Text
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?

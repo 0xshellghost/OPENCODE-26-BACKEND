@@ -3,18 +3,27 @@ import {
     addRepo,
     deleteRepo,
     renameRepo,
+    updateRepoDetails,
     createEvent,
     deleteEvent,
     getAllReposOfEvent,
     incrementPoints,
     getEvents,
     uploadLeaderboard,
-    addAdmin
+    addAdmin,
+    getAllMentors,
+    addMentorRole,
+    removeMentorRole
 } from '../../controllers/admin.controller.js';
 import { participantIssues } from '../../controllers/participant.controller.js';
 import { eventUploader, fileUploader } from '../../middlewares/imageUpload.middleware.js';
 
 const router = express.Router();
+
+// Mentor Management Routes
+router.get('/mentors', getAllMentors);
+router.post('/:userId/addMentor', addMentorRole);
+router.delete('/:userId/removeMentor', removeMentorRole);
 
 // create Event
 //use postman
@@ -24,6 +33,8 @@ router.delete('/delete/:eventName', deleteEvent);
 // get all created Event
 router.get('/events', getEvents);
 router.post('/event/:eventName/repos/add', addRepo);
+// update repos
+router.patch('/event/:eventName/repos/:repoName/update', updateRepoDetails);
 // rename repos
 router.patch('/event/:eventName/repos/:repoName/rename', renameRepo);
 // delete repos

@@ -222,14 +222,228 @@ const addAdmin = async (req, res) => {
     }
 };
 
-// Controller to add repo to event
+const getAllMentors = async (req, res) => {
+    try {
+        const mentors = await prisma.user.findMany({
+            where: {
+                OR: [
+                    { isMentor: true },
+                    { isAdmin: true }
+                ],
+                deletedAt: null
+            },
+            select: {
+                id: true,
+                githubId: true,
+                name: true,
+                avatarUrl: true,
+                isAdmin: true,
+                isMentor: true
+            },
+            orderBy: {
+                githubId: 'asc'
+            }
+        });
+        return response_200(res, 'OK', mentors);
+    } catch (error) {
+        return response_500(res, 'Error while fetching mentors', error);
+    }
+};
+
+const addMentorRole = async (req, res) => {
+    try {
+        const adminId = req.user.id;
+        const { userId } = req.params;
+
+        if (!userId) {
+            return response_400(res, 'GitHub ID is required to assign mentor role');
+        }
+
+        const checkAdmin = await prisma.admin.findUnique({
+            where: {
+                userId: adminId
+            }
+        });
+        if (!checkAdmin) {
+            return response_403(res, 'Only admins can assign mentor roles');
+        }
+
+        const cleanHandle = userId.trim().replace(/^@/, '');
+
+        const existingUser = await prisma.user.findFirst({
+            where: {
+                githubId: cleanHandle
+            }
+        });
+
+        let updatedUser;
+        if (existingUser) {
+            updatedUser = await prisma.user.update({
+                where: {
+                    id: existingUser.id
+                },
+                data: {
+                    isMentor: true
+                }
+            });
+        } else {
+            updatedUser = await prisma.user.create({
+                data: {
+                    githubId: cleanHandle,
+                    name: cleanHandle,
+                    email: `${cleanHandle.toLowerCase()}@users.noreply.github.com`,
+                    avatarUrl: `https://avatars.githubusercontent.com/${cleanHandle}`,
+                    college: 'IIIT Allahabad',
+                    graduationYear: 2026,
+                    branch: 'IT',
+                    degree: 'B.Tech',
+                    year: '3rd',
+                    isMentor: true
+                }
+            });
+        }
+
+        return response_200(res, `User @${cleanHandle} promoted to Mentor successfully`, updatedUser);
+    } catch (error) {
+        return response_500(res, 'Error while adding mentor', error);
+    }
+};
+
+const removeMentorRole = async (req, res) => {
+    try {
+        const adminId = req.user.id;
+        const { userId } = req.params;
+
+        if (!userId) {
+            return response_400(res, 'GitHub ID is required to remove mentor role');
+        }
+
+        const checkAdmin = await prisma.admin.findUnique({
+            where: {
+                userId: adminId
+            }
+        });
+        if (!checkAdmin) {
+            return response_403(res, 'Only admins can remove mentor roles');
+        }
+
+        const cleanHandle = userId.trim().replace(/^@/, '');
+        const existingUser = await prisma.user.findFirst({
+            where: {
+                githubId: cleanHandle
+            }
+        });
+
+        if (!existingUser) {
+            return response_404(res, `User @${cleanHandle} not found`);
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: {
+                id: existingUser.id
+            },
+            data: {
+                isMentor: false
+            }
+        });
+
+        return response_200(res, `Mentor role removed for @${cleanHandle}`, updatedUser);
+    } catch (error) {
+        return response_500(res, 'Error while removing mentor', error);
+    }
+};
+
+const parseJsonArray = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return typeof val === 'string' ? val.split(',').map(s => s.trim()).filter(Boolean) : [];
+    }
+};
+
+const formatRepo = (repo) => {
+    if (!repo) return null;
+    const tags = parseJsonArray(repo.tags);
+    const mentors = parseJsonArray(repo.mentors);
+    return {
+        ...repo,
+        tags,
+        mentors,
+        maintainers: mentors.map(name => ({ name }))
+    };
+};
+
+function buildRepoTags({ repoName, repoDetails, customTags, isFirstYrOnly }) {
+    const tagSet = new Set();
+
+    // 1. Admin-specified tags
+    if (Array.isArray(customTags)) {
+        customTags.forEach(t => t && tagSet.add(String(t).trim()));
+    } else if (typeof customTags === 'string' && customTags.trim()) {
+        customTags.split(',').forEach(t => t && tagSet.add(t.trim()));
+    }
+
+    // 2. GitHub topics if returned by GitHub API
+    if (repoDetails?.topics && Array.isArray(repoDetails.topics)) {
+        repoDetails.topics.forEach(topic => {
+            if (topic) tagSet.add(String(topic).trim());
+        });
+    }
+
+    // 3. Domain inference from repo name, description, language, and topics
+    const combined = `${repoName} ${repoDetails?.description || ''} ${Array.from(tagSet).join(' ')} ${repoDetails?.language || ''}`.toLowerCase();
+
+    if (isFirstYrOnly || combined.includes('fresh') || combined.includes('beginner')) {
+        tagSet.add('Freshers only');
+    }
+    if (combined.includes('ui') || combined.includes('ux') || combined.includes('design') || combined.includes('figma')) {
+        tagSet.add('UI-UX');
+    }
+    if (combined.includes('ai') || combined.includes('ml') || combined.includes('vision') || combined.includes('nlp') || combined.includes('model') || combined.includes('learning')) {
+        tagSet.add('AI-ML');
+    }
+    if (combined.includes('blockchain') || combined.includes('web3') || combined.includes('crypto') || combined.includes('solidity') || combined.includes('contract')) {
+        tagSet.add('Blockchain');
+    }
+    if (combined.includes('game') || combined.includes('canvas') || combined.includes('arcade') || combined.includes('quest') || combined.includes('physics') || combined.includes('unity') || combined.includes('godot')) {
+        tagSet.add('GameDev');
+    }
+    if (combined.includes('app') || combined.includes('flutter') || combined.includes('android') || combined.includes('ios') || combined.includes('dart') || combined.includes('react native')) {
+        tagSet.add('AppDev');
+    }
+    if (combined.includes('cp') || combined.includes('competitive') || combined.includes('dsa') || combined.includes('algorithm') || combined.includes('leetcode')) {
+        tagSet.add('Competitive Programming');
+    }
+    if (combined.includes('git') || combined.includes('vcs') || combined.includes('bash')) {
+        tagSet.add('GitBasics');
+    }
+    if (combined.includes('security') || combined.includes('hack') || combined.includes('ctf') || combined.includes('exploit')) {
+        tagSet.add('Cybersecurity');
+    }
+
+    const standardDomains = [
+        'WebD', 'AppDev', 'UI-UX', 'AI-ML', 'Blockchain', 'GameDev',
+        'Competitive Programming', 'GitBasics', 'Freshers only', 'Cybersecurity'
+    ];
+    const hasDomain = standardDomains.some(d => tagSet.has(d));
+    if (!hasDomain) {
+        tagSet.add('WebD');
+    }
+
+    return Array.from(tagSet);
+}
+
+// Controller to add repo to event with automated tags & admin tags
 const addRepo = async (req, res) => {
     try {
         const { eventName } = req.params;
-        const { repoName } = req.body; //repoName should be a valid repo that exists on github
+        const { repoName, tags, mentors, isFirstYrOnly, isGirlsOnly, description: customDescription } = req.body;
 
         if (!eventName || !repoName) {
-            response_400(
+            return response_400(
                 res,
                 'Event id and repo name are required to add a repo'
             );
@@ -242,7 +456,7 @@ const addRepo = async (req, res) => {
         });
 
         if (!adminUser) {
-            response_400(
+            return response_400(
                 res,
                 `${req.user.id} is not an admin/user of this platform`
             );
@@ -255,45 +469,155 @@ const addRepo = async (req, res) => {
         });
 
         if (!event) {
-            response_400(res, `Could not find the event`);
+            return response_400(res, `Could not find the event`);
         }
 
-        // get the repo description from github api
+        // Get repo description, topics, and language from GitHub API (with proxy support)
         const repoDetails = await getRepoDetails(adminUser.userId, repoName);
 
-        // add repo to event
-        if (repoDetails) {
-            const updateAdmin = await prisma.admin.update({
+        const finalTags = buildRepoTags({
+            repoName,
+            repoDetails,
+            customTags: tags,
+            isFirstYrOnly: Boolean(isFirstYrOnly)
+        });
+        const finalDescription = customDescription || repoDetails?.description || '';
+        const finalLanguage = repoDetails?.language || (repoName.toLowerCase().includes('python') ? 'Python' : 'TypeScript');
+
+        let parsedMentors = [];
+        if (mentors) {
+            const raw = Array.isArray(mentors) ? mentors : (typeof mentors === 'string' ? mentors.split(',') : []);
+            parsedMentors = raw.map(m => String(m).trim().replace(/^@/, '')).filter(Boolean);
+        }
+
+        if (parsedMentors.length > 0) {
+            const validMentors = await prisma.user.findMany({
                 where: {
-                    userId: adminUser.userId
+                    githubId: { in: parsedMentors },
+                    OR: [
+                        { isMentor: true },
+                        { isAdmin: true }
+                    ]
                 },
-                data: {
-                    Repo: {
-                        create: {
-                            name: repoName,
-                            description: repoDetails.description,
-                            event: {
-                                connect: {
-                                    name: eventName
-                                }
+                select: { githubId: true }
+            });
+
+            const validSet = new Set(validMentors.map(m => m.githubId.toLowerCase()));
+            const invalidHandles = parsedMentors.filter(h => !validSet.has(h.toLowerCase()));
+
+            if (invalidHandles.length > 0) {
+                return response_400(
+                    res,
+                    `The following users do not have the Mentor role: ${invalidHandles.map(h => '@' + h).join(', ')}. Please assign them the mentor role first.`
+                );
+            }
+
+            const canonicalMap = new Map(validMentors.map(m => [m.githubId.toLowerCase(), m.githubId]));
+            parsedMentors = parsedMentors.map(h => canonicalMap.get(h.toLowerCase()) || h);
+        }
+
+        const mentorsJson = JSON.stringify(parsedMentors);
+
+        const updateAdmin = await prisma.admin.update({
+            where: {
+                userId: adminUser.userId
+            },
+            data: {
+                Repo: {
+                    create: {
+                        name: repoName,
+                        description: finalDescription,
+                        tags: JSON.stringify(finalTags),
+                        language: finalLanguage,
+                        mentors: mentorsJson,
+                        isFirstYrOnly: Boolean(isFirstYrOnly),
+                        isGirlsOnly: Boolean(isGirlsOnly),
+                        event: {
+                            connect: {
+                                name: eventName
                             }
                         }
                     }
-                },
-                include: {
-                    Repo: {
-                        where: {
-                            name: repoName
-                        }
+                }
+            },
+            include: {
+                Repo: {
+                    where: {
+                        name: repoName
                     }
                 }
-            });
-            response_201(res, 'Repo added successfully', updateAdmin);
-        } else {
-            response_404(res, 'Could not find the repo');
-        }
+            }
+        });
+
+        return response_201(res, 'Repo added successfully', updateAdmin);
     } catch (error) {
-        response_500(res, 'Error while adding repo', error);
+        return response_500(res, 'Error while adding repo', error);
+    }
+};
+
+// Controller to update repo tags, description, language, mentors, or first-year flag
+const updateRepoDetails = async (req, res) => {
+    try {
+        const { eventName, repoName } = req.params;
+        const { tags, mentors, language, description, isFirstYrOnly, isGirlsOnly } = req.body;
+
+        if (!eventName || !repoName) {
+            return response_400(res, 'Event name and repo name are required');
+        }
+
+        const updateData = {};
+        if (tags !== undefined) {
+            updateData.tags = Array.isArray(tags) ? JSON.stringify(tags) : (typeof tags === 'string' ? tags : JSON.stringify([]));
+        }
+        if (mentors !== undefined) {
+            let parsedMentors = [];
+            if (Array.isArray(mentors)) {
+                parsedMentors = mentors.map(m => String(m).trim().replace(/^@/, '')).filter(Boolean);
+            } else if (typeof mentors === 'string') {
+                parsedMentors = mentors.split(',').map(m => m.trim().replace(/^@/, '')).filter(Boolean);
+            }
+
+            if (parsedMentors.length > 0) {
+                const validMentors = await prisma.user.findMany({
+                    where: {
+                        githubId: { in: parsedMentors },
+                        OR: [
+                            { isMentor: true },
+                            { isAdmin: true }
+                        ]
+                    },
+                    select: { githubId: true }
+                });
+
+                const validSet = new Set(validMentors.map(m => m.githubId.toLowerCase()));
+                const invalidHandles = parsedMentors.filter(h => !validSet.has(h.toLowerCase()));
+
+                if (invalidHandles.length > 0) {
+                    return response_400(
+                        res,
+                        `The following users do not have the Mentor role: ${invalidHandles.map(h => '@' + h).join(', ')}. Please assign them the mentor role first.`
+                    );
+                }
+
+                const canonicalMap = new Map(validMentors.map(m => [m.githubId.toLowerCase(), m.githubId]));
+                parsedMentors = parsedMentors.map(h => canonicalMap.get(h.toLowerCase()) || h);
+            }
+
+            updateData.mentors = JSON.stringify(parsedMentors);
+        }
+        if (language !== undefined) updateData.language = language;
+        if (description !== undefined) updateData.description = description;
+        if (isFirstYrOnly !== undefined) updateData.isFirstYrOnly = Boolean(isFirstYrOnly);
+        if (isGirlsOnly !== undefined) updateData.isGirlsOnly = Boolean(isGirlsOnly);
+
+        const updatedRepo = await prisma.repo.update({
+            where: { name: repoName },
+            data: updateData
+        });
+
+        return response_200(res, 'Repo updated successfully', formatRepo(updatedRepo));
+    } catch (error) {
+        return response_500(res, 'Error while updating repo', error);
     }
 };
 //deletes repo and ev ery instance of it
@@ -461,12 +785,13 @@ const getAllReposOfEvent = async (req, res) => {
         });
 
         if (!repos) {
-            response_400(res, `Could not find the repos`);
+            return response_400(res, `Could not find the repos`);
         }
 
-        response_200(res, 'Repos fetched successfully', repos);
-    } catch {
-        console.log(error);
+        return response_200(res, 'Repos fetched successfully', repos.map(formatRepo));
+    } catch (error) {
+        console.error(error);
+        return response_500(res, 'Error while fetching repos', error);
     }
 };
 
@@ -726,7 +1051,11 @@ export {
     addRepo,
     deleteRepo,
     renameRepo,
+    updateRepoDetails,
     getAllReposOfEvent,
     incrementPoints,
-    uploadLeaderboard
+    uploadLeaderboard,
+    getAllMentors,
+    addMentorRole,
+    removeMentorRole
 };

@@ -66,19 +66,48 @@ const getEvent = async (req, res) => {
     }
 };
 
+const parseJsonArray = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return typeof val === 'string' ? val.split(',').map(s => s.trim()).filter(Boolean) : [];
+    }
+};
+
+const formatRepo = (repo) => {
+    if (!repo) return null;
+    const tags = parseJsonArray(repo.tags);
+    const mentors = parseJsonArray(repo.mentors);
+    return {
+        ...repo,
+        tags,
+        mentors,
+        maintainers: mentors.map(name => ({ name }))
+    };
+};
+
 const getAllReposOfEvent = async (req, res) => {
     try {
-        const AllReposOfEvent = await prisma.repo.findMany({
+        const repos = await prisma.repo.findMany({
             where: {
                 eventName: req.params.eventName
             },
             select: {
+                id: true,
                 name: true,
-                description: true
+                description: true,
+                tags: true,
+                language: true,
+                mentors: true,
+                isFirstYrOnly: true,
+                isGirlsOnly: true
             }
         });
 
-        return response_200(res, 'OK', AllReposOfEvent);
+        return response_200(res, 'OK', repos.map(formatRepo));
     } catch (error) {
         response_500(res, 'Error', error);
     }
@@ -91,8 +120,14 @@ const getRepoOfEvent = async (req, res) => {
                 name: req.params.repoName
             },
             select: {
+                id: true,
                 name: true,
                 description: true,
+                tags: true,
+                language: true,
+                mentors: true,
+                isFirstYrOnly: true,
+                isGirlsOnly: true,
                 eventName: true,
                 issues: {
                     take: 5,
@@ -107,7 +142,12 @@ const getRepoOfEvent = async (req, res) => {
                 }
             }
         });
-        return response_200(res, 'OK', RepoOfEvent);
+
+        if (!RepoOfEvent) {
+            return response_404(res, 'Repo not found');
+        }
+
+        return response_200(res, 'OK', formatRepo(RepoOfEvent));
     } catch (error) {
         response_500(res, 'Error', error);
     }
@@ -133,6 +173,8 @@ const getLeaderboard = async (req, res) => {
                                 avatarUrl: true,
                                 college: true,
                                 graduationYear: true,
+                                isMentor: true,
+                                isAdmin: true,
                                 createdAt: true
                             }
                         }
@@ -173,6 +215,7 @@ const getLeaderboard = async (req, res) => {
             const avatarUrl = user?.avatarUrl || (githubId ? `https://avatars.githubusercontent.com/${githubId}` : null);
             const collegeName = user?.college || 'N/A';
             const graduationYear = user?.graduationYear || '';
+            const isMentor = Boolean(user?.isMentor || user?.isAdmin);
 
             // 1. OpenCode: contains Rank, Name, github Id, PRs Merged, and Points
             if (isOpencode) {
@@ -189,7 +232,8 @@ const getLeaderboard = async (req, res) => {
                     points: entry.points ?? 0,
                     avatarUrl,
                     collegeName,
-                    graduationYear
+                    graduationYear,
+                    isMentor
                 };
             }
 

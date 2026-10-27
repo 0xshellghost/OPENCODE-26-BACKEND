@@ -7,11 +7,14 @@ import {
     getLeaderboard
 } from '../../controllers/events.controller.js';
 import { isAdmin } from '../../middlewares/isAdmin.middleware.js';
-import { addRepo } from '../../controllers/admin.controller.js';
+import { addRepo, getAllMentors } from '../../controllers/admin.controller.js';
 import { registerParticipantForEvent } from '../../controllers/participant.controller.js';
 import userAuth from '../../middlewares/userAuth.middleware.js';
 
 const eventRouter = express.Router();
+
+// Public mentors list
+eventRouter.get('/mentors', getAllMentors);
 
 //all events
 eventRouter.get('/', getAllEvents);

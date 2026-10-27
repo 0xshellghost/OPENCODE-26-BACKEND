@@ -6,6 +6,8 @@
     "type": "module",
     "scripts": {
         "start": "node ./src/app.js",
+        "build": "prisma generate",
+        "postinstall": "prisma generate",
         "dev": "concurrently \"nodemon ./src/app.js\" \"npm --prefix ../r-place-proto run dev\"",
         "pushdb": "prisma db push",
         "migrate": "prisma migrate dev",
@@ -27,6 +29,7 @@
     },
     "dependencies": {
         "@prisma/client": "^5.22.0",
+        "prisma": "^5.22.0",
         "axios": "^1.5.0",
         "babel": "^6.23.0",
         "cloudinary": "^1.41.0",

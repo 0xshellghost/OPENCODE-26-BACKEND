@@ -195,6 +195,9 @@ const getPRPoints = async (req, res) => {
             },
             select: {
                 PR: {
+                    where: {
+                        status: 'MERGED'
+                    },
                     select: {
                         points: true
                     }

@@ -1,4 +1,4 @@
-import prisma from '../config/db.config.js';
+import prisma from '../config/prisma.config.js';
 import {
     response_200,
     response_201,
@@ -8,46 +8,49 @@ import {
     response_500
 } from '../utils/responseCodes.js';
 
-const ORDER_STATUS = {
+// Order and Payment Status Enums
+export const ORDER_STATUS = Object.freeze({
     PLACED: 'PLACED',
     APPROVED: 'APPROVED',
     FULFILLED: 'FULFILLED',
     REJECTED: 'REJECTED',
     CANCELLED: 'CANCELLED'
-};
+});
 
-const PAYMENT_METHOD = {
-    GEEKCOIN: 'GEEKCOIN',
+export const PAYMENT_METHOD = Object.freeze({
+    CASH: 'CASH',
     RAZORPAY: 'RAZORPAY',
     STRIPE: 'STRIPE',
+    COD: 'COD',
     OTHER: 'OTHER'
-};
+});
 
-const PAYMENT_STATUS = {
+export const PAYMENT_STATUS = Object.freeze({
     PENDING: 'PENDING',
     COMPLETED: 'COMPLETED',
     FAILED: 'FAILED',
     REFUNDED: 'REFUNDED'
-};
+});
 
-const parsePositiveInt = (value, name, max = 2147483647) => {
-    const num = Number(value);
+// Helper validation functions
+const parsePositiveInt = (val, fieldName, max = Number.MAX_SAFE_INTEGER) => {
+    const num = Number(val);
     if (!Number.isInteger(num) || num <= 0) {
-        throw new Error(`${name} must be a positive integer`);
+        throw new Error(`${fieldName} must be a positive integer`);
     }
     if (num > max) {
-        throw new Error(`${name} exceeds maximum limit of ${max}`);
+        throw new Error(`${fieldName} cannot exceed ${max}`);
     }
     return num;
 };
 
-const parseNonNegativeInt = (value, name, max = 2147483647) => {
-    const num = Number(value);
+const parseNonNegativeInt = (val, fieldName, max = Number.MAX_SAFE_INTEGER) => {
+    const num = Number(val);
     if (!Number.isInteger(num) || num < 0) {
-        throw new Error(`${name} must be a non-negative integer`);
+        throw new Error(`${fieldName} must be a non-negative integer`);
     }
     if (num > max) {
-        throw new Error(`${name} exceeds maximum limit of ${max}`);
+        throw new Error(`${fieldName} cannot exceed ${max}`);
     }
     return num;
 };
@@ -58,52 +61,106 @@ const paginate = (req, defaultLimit = 20, maxLimit = 100) => {
         maxLimit,
         Math.max(1, parseInt(req.query.limit, 10) || defaultLimit)
     );
-    return { page, limit, skip: (page - 1) * limit };
+    const skip = (page - 1) * limit;
+    return { page, limit, skip };
 };
 
-// --- Store Catalog & Details ---
+// Helper to format cart summary
+const formatCartResponse = (cart) => {
+    let totalItems = 0;
+    let subtotal = 0;
+    let canCheckout = (cart.items && cart.items.length > 0);
+
+    const formattedItems = (cart.items || []).map((cartItem) => {
+        const item = cartItem.item;
+        const isAvailable = Boolean(
+            item &&
+            item.isActive &&
+            !item.deletedAt &&
+            item.stock >= cartItem.quantity
+        );
+
+        if (!isAvailable) {
+            canCheckout = false;
+        }
+
+        const itemTotal = (item?.price || 0) * cartItem.quantity;
+        totalItems += cartItem.quantity;
+        subtotal += itemTotal;
+
+        return {
+            id: cartItem.id,
+            itemId: cartItem.itemId,
+            quantity: cartItem.quantity,
+            size: cartItem.size,
+            unitPrice: item?.price || 0,
+            itemTotal,
+            isAvailable,
+            item: item
+                ? {
+                      id: item.id,
+                      name: item.name,
+                      description: item.description,
+                      imageUrl: item.imageUrl,
+                      category: item.category,
+                      price: item.price,
+                      stock: item.stock,
+                      isActive: item.isActive
+                  }
+                : null,
+            createdAt: cartItem.createdAt,
+            updatedAt: cartItem.updatedAt
+        };
+    });
+
+    return {
+        id: cart.id,
+        githubId: cart.githubId,
+        totalItems,
+        subtotal,
+        currency: 'INR',
+        canCheckout,
+        items: formattedItems
+    };
+};
+
+/*   PUBLIC CATALOG ENDPOINTS */
 
 export const listGeekstoreItems = async (req, res) => {
     try {
-        const { page, limit, skip } = paginate(req, 40, 100);
+        const { page, limit, skip } = paginate(req, 20, 100);
         const { category, search, inStockOnly } = req.query;
 
         const where = {
             isActive: true,
-            deletedAt: null,
-            ...(inStockOnly === 'true' && { stock: { gt: 0 } }),
-            ...(category && { category: String(category).trim() }),
-            ...(search && {
-                OR: [
-                    { name: { contains: String(search).trim() } },
-                    { description: { contains: String(search).trim() } }
-                ]
-            })
+            deletedAt: null
         };
+
+        if (category && typeof category === 'string' && category.trim()) {
+            where.category = category.trim();
+        }
+
+        if (search && typeof search === 'string' && search.trim()) {
+            where.name = {
+                contains: search.trim()
+            };
+        }
+
+        if (inStockOnly === 'true' || inStockOnly === true) {
+            where.stock = { gt: 0 };
+        }
 
         const [total, items] = await Promise.all([
             prisma.gCStoreItem.count({ where }),
             prisma.gCStoreItem.findMany({
                 where,
-                select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    imageUrl: true,
-                    category: true,
-                    price: true,
-                    cashPrice: true,
-                    stock: true,
-                    isActive: true,
-                    createdAt: true
-                },
-                orderBy: [{ price: 'asc' }, { createdAt: 'desc' }],
+                orderBy: [{ stock: 'desc' }, { createdAt: 'desc' }],
                 skip,
                 take: limit
             })
         ]);
 
-        return response_200(res, 'Geekstore items fetched successfully', {
+        return response_200(res, 'Items fetched successfully', {
             items,
             pagination: {
                 total,
@@ -126,18 +183,6 @@ export const getGeekstoreItemById = async (req, res) => {
                 id: itemId,
                 isActive: true,
                 deletedAt: null
-            },
-            select: {
-                id: true,
-                name: true,
-                description: true,
-                imageUrl: true,
-                category: true,
-                price: true,
-                cashPrice: true,
-                stock: true,
-                isActive: true,
-                createdAt: true
             }
         });
 
@@ -151,9 +196,455 @@ export const getGeekstoreItemById = async (req, res) => {
     }
 };
 
-// User Redemptions & Orders
+/* CART ENDPOINTS (AUTHENTICATED USER)*/
 
-export const redeemGeekstoreItem = async (req, res) => {
+export const getMyCart = async (req, res) => {
+    try {
+        const githubId = req.user.id;
+
+        const cart = await prisma.gCCart.upsert({
+            where: { githubId },
+            update: {},
+            create: { githubId },
+            include: {
+                items: {
+                    include: { item: true },
+                    orderBy: { createdAt: 'desc' }
+                }
+            }
+        });
+
+        return response_200(res, 'Cart fetched successfully', formatCartResponse(cart));
+    } catch (error) {
+        return response_500(res, 'Failed to fetch cart', error);
+    }
+};
+
+export const addToCart = async (req, res) => {
+    try {
+        const githubId = req.user.id;
+        const { itemId } = req.body;
+
+        if (!itemId || typeof itemId !== 'string') {
+            return response_400(res, 'itemId is required');
+        }
+
+        let quantity = 1;
+        try {
+            quantity = parsePositiveInt(req.body.quantity || 1, 'quantity', 10);
+        } catch (err) {
+            return response_400(res, err.message);
+        }
+
+        const size = req.body.size ? String(req.body.size).trim().slice(0, 20) : null;
+
+        const item = await prisma.gCStoreItem.findFirst({
+            where: {
+                id: itemId,
+                isActive: true,
+                deletedAt: null
+            }
+        });
+
+        if (!item) {
+            return response_404(res, 'Item not found or unavailable');
+        }
+
+        if (item.stock < quantity) {
+            return response_400(
+                res,
+                `Insufficient stock available (requested: ${quantity}, available: ${item.stock})`
+            );
+        }
+
+        const cart = await prisma.gCCart.upsert({
+            where: { githubId },
+            update: {},
+            create: { githubId }
+        });
+
+        // Check if item with this size is already in the cart
+        const existingCartItem = await prisma.gCCartItem.findFirst({
+            where: {
+                cartId: cart.id,
+                itemId,
+                size
+            }
+        });
+
+        if (existingCartItem) {
+            const newQuantity = existingCartItem.quantity + quantity;
+            if (newQuantity > item.stock) {
+                return response_400(
+                    res,
+                    `Cannot add more. You already have ${existingCartItem.quantity} in cart, available stock is ${item.stock}`
+                );
+            }
+            if (newQuantity > 10) {
+                return response_400(res, 'Maximum 10 units of an item allowed per cart');
+            }
+
+            await prisma.gCCartItem.update({
+                where: { id: existingCartItem.id },
+                data: { quantity: newQuantity }
+            });
+        } else {
+            await prisma.gCCartItem.create({
+                data: {
+                    cartId: cart.id,
+                    itemId,
+                    quantity,
+                    size
+                }
+            });
+        }
+
+        const updatedCart = await prisma.gCCart.findUnique({
+            where: { id: cart.id },
+            include: {
+                items: {
+                    include: { item: true },
+                    orderBy: { createdAt: 'desc' }
+                }
+            }
+        });
+
+        return response_200(res, 'Item added to cart', formatCartResponse(updatedCart));
+    } catch (error) {
+        return response_500(res, 'Failed to add item to cart', error);
+    }
+};
+
+export const updateCartItem = async (req, res) => {
+    try {
+        const githubId = req.user.id;
+        const { cartItemId } = req.params;
+        const { quantity, size } = req.body;
+
+        const cart = await prisma.gCCart.findUnique({
+            where: { githubId }
+        });
+
+        if (!cart) {
+            return response_404(res, 'Cart not found');
+        }
+
+        const cartItem = await prisma.gCCartItem.findFirst({
+            where: {
+                id: cartItemId,
+                cartId: cart.id
+            },
+            include: { item: true }
+        });
+
+        if (!cartItem) {
+            return response_404(res, 'Item not found in your cart');
+        }
+
+        // If quantity is explicitly 0 or less, remove item
+        if (quantity !== undefined && Number(quantity) <= 0) {
+            await prisma.gCCartItem.delete({
+                where: { id: cartItemId }
+            });
+        } else {
+            const updateData = {};
+
+            if (quantity !== undefined) {
+                let parsedQty;
+                try {
+                    parsedQty = parsePositiveInt(quantity, 'quantity', 10);
+                } catch (err) {
+                    return response_400(res, err.message);
+                }
+
+                if (cartItem.item.stock < parsedQty) {
+                    return response_400(
+                        res,
+                        `Insufficient stock. Available stock is ${cartItem.item.stock}`
+                    );
+                }
+                updateData.quantity = parsedQty;
+            }
+
+            if (size !== undefined) {
+                updateData.size = size ? String(size).trim().slice(0, 20) : null;
+            }
+
+            if (Object.keys(updateData).length > 0) {
+                await prisma.gCCartItem.update({
+                    where: { id: cartItemId },
+                    data: updateData
+                });
+            }
+        }
+
+        const updatedCart = await prisma.gCCart.findUnique({
+            where: { id: cart.id },
+            include: {
+                items: {
+                    include: { item: true },
+                    orderBy: { createdAt: 'desc' }
+                }
+            }
+        });
+
+        return response_200(res, 'Cart updated successfully', formatCartResponse(updatedCart));
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return response_400(
+                res,
+                'An item with this size is already in your cart. Please adjust quantity instead.'
+            );
+        }
+        return response_500(res, 'Failed to update cart item', error);
+    }
+};
+
+export const removeCartItem = async (req, res) => {
+    try {
+        const githubId = req.user.id;
+        const { cartItemId } = req.params;
+
+        const cart = await prisma.gCCart.findUnique({
+            where: { githubId }
+        });
+
+        if (!cart) {
+            return response_404(res, 'Cart not found');
+        }
+
+        const existingItem = await prisma.gCCartItem.findFirst({
+            where: {
+                id: cartItemId,
+                cartId: cart.id
+            }
+        });
+
+        if (!existingItem) {
+            return response_404(res, 'Cart item not found');
+        }
+
+        await prisma.gCCartItem.delete({
+            where: { id: cartItemId }
+        });
+
+        const updatedCart = await prisma.gCCart.findUnique({
+            where: { id: cart.id },
+            include: {
+                items: {
+                    include: { item: true },
+                    orderBy: { createdAt: 'desc' }
+                }
+            }
+        });
+
+        return response_200(res, 'Item removed from cart', formatCartResponse(updatedCart));
+    } catch (error) {
+        return response_500(res, 'Failed to remove cart item', error);
+    }
+};
+
+export const clearCart = async (req, res) => {
+    try {
+        const githubId = req.user.id;
+
+        const cart = await prisma.gCCart.findUnique({
+            where: { githubId }
+        });
+
+        if (cart) {
+            await prisma.gCCartItem.deleteMany({
+                where: { cartId: cart.id }
+            });
+        }
+
+        return response_200(res, 'Cart cleared successfully', {
+            items: [],
+            totalItems: 0,
+            subtotal: 0,
+            canCheckout: false
+        });
+    } catch (error) {
+        return response_500(res, 'Failed to clear cart', error);
+    }
+};
+
+/* CHECKOUT & DIRECT ORDER (CASH ONLY)*/
+
+export const checkoutCart = async (req, res) => {
+    try {
+        const githubId = req.user.id;
+
+        const shippingAddress = req.body.shippingAddress?.trim()?.slice(0, 1000) || null;
+        const contactNumber = req.body.contactNumber?.trim()?.slice(0, 30) || null;
+        const userNote = req.body.userNote?.trim()?.slice(0, 500) || null;
+
+        let paymentMethod = PAYMENT_METHOD.CASH;
+        if (req.body.paymentMethod) {
+            const methodUpper = String(req.body.paymentMethod).toUpperCase();
+            if (PAYMENT_METHOD[methodUpper]) {
+                paymentMethod = PAYMENT_METHOD[methodUpper];
+            } else {
+                return response_400(
+                    res,
+                    `Invalid paymentMethod. Allowed: ${Object.values(PAYMENT_METHOD).join(', ')}`
+                );
+            }
+        }
+
+        const rawIdempotency = req.headers['x-idempotency-key'];
+        const idempotencyKey = typeof rawIdempotency === 'string' && rawIdempotency.trim()
+            ? rawIdempotency.trim()
+            : null;
+
+        const cart = await prisma.gCCart.findUnique({
+            where: { githubId },
+            include: {
+                items: {
+                    include: { item: true }
+                }
+            }
+        });
+
+        if (!cart || !cart.items || cart.items.length === 0) {
+            return response_400(res, 'Cart is empty. Add items before checking out.');
+        }
+
+        // Execute checkout transactionally
+        const result = await prisma.$transaction(async (tx) => {
+            // Idempotency check inside transaction
+            if (idempotencyKey) {
+                const existingOrder = await tx.gCOrder.findUnique({
+                    where: { idempotencyKey },
+                    include: {
+                        items: { include: { item: true } }
+                    }
+                });
+
+                if (existingOrder) {
+                    if (existingOrder.githubId !== githubId) {
+                        throw new Error('IDEMPOTENCY_CONFLICT');
+                    }
+                    return { order: existingOrder, alreadyExists: true };
+                }
+            }
+
+            let calculatedTotal = 0;
+            const orderItemsData = [];
+
+            // Verify stock and decrement for each item atomically
+            for (const cartItem of cart.items) {
+                const storeItem = await tx.gCStoreItem.findFirst({
+                    where: {
+                        id: cartItem.itemId,
+                        isActive: true,
+                        deletedAt: null
+                    }
+                });
+
+                if (!storeItem) {
+                    throw new Error(`ITEM_UNAVAILABLE:${cartItem.item?.name || cartItem.itemId}`);
+                }
+
+                if (storeItem.stock < cartItem.quantity) {
+                    throw new Error(
+                        `INSUFFICIENT_STOCK:${storeItem.name} (requested: ${cartItem.quantity}, in stock: ${storeItem.stock})`
+                    );
+                }
+
+                // Decrement stock conditionally
+                const stockUpdate = await tx.gCStoreItem.updateMany({
+                    where: {
+                        id: storeItem.id,
+                        stock: { gte: cartItem.quantity },
+                        isActive: true,
+                        deletedAt: null
+                    },
+                    data: {
+                        stock: { decrement: cartItem.quantity }
+                    }
+                });
+
+                if (!stockUpdate.count) {
+                    throw new Error(`OUT_OF_STOCK:${storeItem.name}`);
+                }
+
+                const itemTotalPrice = storeItem.price * cartItem.quantity;
+                calculatedTotal += itemTotalPrice;
+
+                orderItemsData.push({
+                    itemId: storeItem.id,
+                    quantity: cartItem.quantity,
+                    unitPrice: storeItem.price,
+                    totalPrice: itemTotalPrice,
+                    size: cartItem.size
+                });
+            }
+
+            // Create Order
+            const order = await tx.gCOrder.create({
+                data: {
+                    githubId,
+                    totalAmount: calculatedTotal,
+                    currency: 'INR',
+                    paymentMethod,
+                    paymentStatus: PAYMENT_STATUS.PENDING,
+                    status: ORDER_STATUS.PLACED,
+                    shippingAddress,
+                    contactNumber,
+                    userNote,
+                    idempotencyKey,
+                    items: {
+                        create: orderItemsData
+                    }
+                },
+                include: {
+                    items: {
+                        include: { item: true }
+                    }
+                }
+            });
+
+            // Empty the user's cart
+            await tx.gCCartItem.deleteMany({
+                where: { cartId: cart.id }
+            });
+
+            return { order, alreadyExists: false };
+        });
+
+        if (result.alreadyExists) {
+            return response_200(res, 'Order already placed', result.order);
+        }
+
+        return response_201(res, 'Order placed successfully', result.order);
+    } catch (error) {
+        if (error.message === 'IDEMPOTENCY_CONFLICT') {
+            return response_403(res, 'Idempotency key belongs to another user');
+        }
+        if (error.message.startsWith('ITEM_UNAVAILABLE:')) {
+            const name = error.message.split(':')[1];
+            return response_400(res, `Item "${name}" is no longer available`);
+        }
+        if (error.message.startsWith('INSUFFICIENT_STOCK:') || error.message.startsWith('OUT_OF_STOCK:')) {
+            const detail = error.message.split(':')[1];
+            return response_400(res, `Insufficient stock for item: ${detail}`);
+        }
+        if (error.code === 'P2002') {
+            const retryOrder = await prisma.gCOrder.findUnique({
+                where: { idempotencyKey: req.headers['x-idempotency-key']?.trim() },
+                include: { items: { include: { item: true } } }
+            });
+            if (retryOrder && retryOrder.githubId === req.user.id) {
+                return response_200(res, 'Order already placed', retryOrder);
+            }
+            return response_400(res, 'Duplicate request detected');
+        }
+        return response_500(res, 'Failed to checkout cart', error);
+    }
+};
+
+export const createDirectOrder = async (req, res) => {
     try {
         const { itemId } = req.params;
         const githubId = req.user.id;
@@ -165,31 +656,44 @@ export const redeemGeekstoreItem = async (req, res) => {
             return response_400(res, err.message);
         }
 
+        const size = req.body.size ? String(req.body.size).trim().slice(0, 20) : null;
         const shippingAddress = req.body.shippingAddress?.trim()?.slice(0, 1000) || null;
         const contactNumber = req.body.contactNumber?.trim()?.slice(0, 30) || null;
-        const size = req.body.size?.trim()?.slice(0, 20) || null;
         const userNote = req.body.userNote?.trim()?.slice(0, 500) || null;
+
+        let paymentMethod = PAYMENT_METHOD.CASH;
+        if (req.body.paymentMethod) {
+            const methodUpper = String(req.body.paymentMethod).toUpperCase();
+            if (PAYMENT_METHOD[methodUpper]) {
+                paymentMethod = PAYMENT_METHOD[methodUpper];
+            } else {
+                return response_400(
+                    res,
+                    `Invalid paymentMethod. Allowed: ${Object.values(PAYMENT_METHOD).join(', ')}`
+                );
+            }
+        }
 
         const rawIdempotency = req.headers['x-idempotency-key'];
         const idempotencyKey = typeof rawIdempotency === 'string' && rawIdempotency.trim()
             ? rawIdempotency.trim()
             : null;
 
-        if (idempotencyKey) {
-            const existingOrder = await prisma.gCOrder.findUnique({
-                where: { idempotencyKey },
-                include: { item: true }
-            });
-
-            if (existingOrder) {
-                if (existingOrder.githubId !== githubId) {
-                    return response_403(res, 'Idempotency key belongs to another user');
-                }
-                return response_200(res, 'Order already placed', existingOrder);
-            }
-        }
-
         const result = await prisma.$transaction(async (tx) => {
+            if (idempotencyKey) {
+                const existingOrder = await tx.gCOrder.findUnique({
+                    where: { idempotencyKey },
+                    include: { items: { include: { item: true } } }
+                });
+
+                if (existingOrder) {
+                    if (existingOrder.githubId !== githubId) {
+                        throw new Error('IDEMPOTENCY_CONFLICT');
+                    }
+                    return { order: existingOrder, alreadyExists: true };
+                }
+            }
+
             const item = await tx.gCStoreItem.findFirst({
                 where: {
                     id: itemId,
@@ -202,9 +706,7 @@ export const redeemGeekstoreItem = async (req, res) => {
                 throw new Error('ITEM_NOT_FOUND');
             }
 
-            const totalPrice = item.price * quantity;
-
-            // Conditional decrement to prevent overselling
+            // Decrement stock
             const stockUpdate = await tx.gCStoreItem.updateMany({
                 where: {
                     id: item.id,
@@ -221,112 +723,95 @@ export const redeemGeekstoreItem = async (req, res) => {
                 throw new Error('OUT_OF_STOCK');
             }
 
-            const wallet = await tx.gC_Wallet.upsert({
-                where: { githubId },
-                update: {},
-                create: { githubId, balance: 0 }
-            });
-
-            // Conditional decrement to prevent double spending
-            const walletUpdate = await tx.gC_Wallet.updateMany({
-                where: {
-                    id: wallet.id,
-                    balance: { gte: totalPrice }
-                },
-                data: {
-                    balance: { decrement: totalPrice }
-                }
-            });
-
-            if (!walletUpdate.count) {
-                throw new Error('INSUFFICIENT_COINS');
-            }
-
-            const txKey = idempotencyKey
-                ? `tx-${idempotencyKey}`
-                : `tx-order-${githubId}-${item.id}-${Date.now()}`;
-
-            await tx.gC_Transaction.create({
-                data: {
-                    walletId: wallet.id,
-                    githubId,
-                    amount: -totalPrice,
-                    eventName: null,
-                    idempotencyKey: txKey
-                }
-            });
+            const totalAmount = item.price * quantity;
 
             const order = await tx.gCOrder.create({
                 data: {
-                    itemId: item.id,
                     githubId,
-                    quantity,
-                    unitPrice: item.price,
-                    totalPrice,
-                    currency: 'GC',
-                    paymentMethod: PAYMENT_METHOD.GEEKCOIN,
-                    paymentStatus: PAYMENT_STATUS.COMPLETED,
+                    totalAmount,
+                    currency: 'INR',
+                    paymentMethod,
+                    paymentStatus: PAYMENT_STATUS.PENDING,
                     status: ORDER_STATUS.PLACED,
                     shippingAddress,
                     contactNumber,
-                    size,
                     userNote,
-                    idempotencyKey
+                    idempotencyKey,
+                    items: {
+                        create: [
+                            {
+                                itemId: item.id,
+                                quantity,
+                                unitPrice: item.price,
+                                totalPrice: totalAmount,
+                                size
+                            }
+                        ]
+                    }
                 },
-                include: { item: true }
+                include: {
+                    items: {
+                        include: { item: true }
+                    }
+                }
             });
 
-            const updatedWallet = await tx.gC_Wallet.findUnique({
-                where: { id: wallet.id }
-            });
-
-            return { order, wallet: updatedWallet };
+            return { order, alreadyExists: false };
         });
 
-        return response_201(res, 'Item redeemed successfully', result);
+        if (result.alreadyExists) {
+            return response_200(res, 'Order already placed', result.order);
+        }
+
+        return response_201(res, 'Order placed successfully', result.order);
     } catch (error) {
+        if (error.message === 'IDEMPOTENCY_CONFLICT') {
+            return response_403(res, 'Idempotency key belongs to another user');
+        }
         if (error.message === 'ITEM_NOT_FOUND') {
-            return response_404(res, 'Item not available');
+            return response_404(res, 'Item not found');
         }
         if (error.message === 'OUT_OF_STOCK') {
             return response_400(res, 'Insufficient stock for this item');
         }
-        if (error.message === 'INSUFFICIENT_COINS') {
-            return response_400(res, 'Insufficient Geekcoin balance');
-        }
         if (error.code === 'P2002') {
             const retryOrder = await prisma.gCOrder.findUnique({
                 where: { idempotencyKey: req.headers['x-idempotency-key']?.trim() },
-                include: { item: true }
+                include: { items: { include: { item: true } } }
             });
             if (retryOrder && retryOrder.githubId === req.user.id) {
                 return response_200(res, 'Order already placed', retryOrder);
             }
             return response_400(res, 'Duplicate request detected');
         }
-        return response_500(res, 'Error processing redemption', error);
+        return response_500(res, 'Failed to place order', error);
     }
 };
+
+/* ORDER HISTORY & CANCELLATION (AUTHENTICATED USER)*/
 
 export const getMyGeekstoreOrders = async (req, res) => {
     try {
         const githubId = req.user.id;
         const { page, limit, skip } = paginate(req, 20, 100);
-        const { status } = req.query;
 
-        const where = {
-            githubId,
-            ...(status && { status })
-        };
+        const where = { githubId };
+        if (req.query.status && ORDER_STATUS[req.query.status.toUpperCase()]) {
+            where.status = req.query.status.toUpperCase();
+        }
 
         const [total, orders] = await Promise.all([
             prisma.gCOrder.count({ where }),
             prisma.gCOrder.findMany({
                 where,
-                include: { item: true },
                 orderBy: { createdAt: 'desc' },
                 skip,
-                take: limit
+                take: limit,
+                include: {
+                    items: {
+                        include: { item: true }
+                    }
+                }
             })
         ]);
 
@@ -346,19 +831,23 @@ export const getMyGeekstoreOrders = async (req, res) => {
 
 export const getMyGeekstoreOrderById = async (req, res) => {
     try {
+        const { orderId } = req.params;
+        const githubId = req.user.id;
+
         const order = await prisma.gCOrder.findFirst({
-            where: {
-                id: req.params.orderId,
-                githubId: req.user.id
-            },
-            include: { item: true }
+            where: { id: orderId, githubId },
+            include: {
+                items: {
+                    include: { item: true }
+                }
+            }
         });
 
         if (!order) {
             return response_404(res, 'Order not found');
         }
 
-        return response_200(res, 'Order details fetched successfully', order);
+        return response_200(res, 'Order fetched successfully', order);
     } catch (error) {
         return response_500(res, 'Failed to fetch order', error);
     }
@@ -371,7 +860,7 @@ export const cancelMyGeekstoreOrder = async (req, res) => {
 
         const order = await prisma.gCOrder.findFirst({
             where: { id: orderId, githubId },
-            include: { item: true }
+            include: { items: true }
         });
 
         if (!order) {
@@ -394,8 +883,13 @@ export const cancelMyGeekstoreOrder = async (req, res) => {
                 },
                 data: {
                     status: ORDER_STATUS.CANCELLED,
-                    paymentStatus: PAYMENT_STATUS.REFUNDED,
-                    userNote: order.userNote ? `${order.userNote} [Cancelled by user]` : 'Cancelled by user'
+                    paymentStatus:
+                        order.paymentStatus === PAYMENT_STATUS.COMPLETED
+                            ? PAYMENT_STATUS.REFUNDED
+                            : PAYMENT_STATUS.FAILED,
+                    userNote: order.userNote
+                        ? `${order.userNote} [Cancelled by user]`
+                        : 'Cancelled by user'
                 }
             });
 
@@ -403,113 +897,56 @@ export const cancelMyGeekstoreOrder = async (req, res) => {
                 throw new Error('CONCURRENT_MODIFICATION');
             }
 
-            // Refund coins if paid with Geekcoins
-            if (order.paymentMethod === PAYMENT_METHOD.GEEKCOIN) {
-                const wallet = await tx.gC_Wallet.upsert({
-                    where: { githubId },
-                    update: { balance: { increment: order.totalPrice } },
-                    create: { githubId, balance: order.totalPrice }
-                });
-
-                await tx.gC_Transaction.create({
-                    data: {
-                        walletId: wallet.id,
-                        githubId,
-                        amount: order.totalPrice,
-                        eventName: null,
-                        idempotencyKey: `refund-user-cancel-${order.id}`
-                    }
+            // Restock all items from the order
+            for (const orderItem of order.items) {
+                await tx.gCStoreItem.update({
+                    where: { id: orderItem.itemId },
+                    data: { stock: { increment: orderItem.quantity } }
                 });
             }
 
-            // Restock item
-            await tx.gCStoreItem.update({
-                where: { id: order.itemId },
-                data: { stock: { increment: order.quantity } }
-            });
-
             const refreshedOrder = await tx.gCOrder.findUnique({
                 where: { id: orderId },
-                include: { item: true }
+                include: { items: { include: { item: true } } }
             });
 
-            const currentWallet = await tx.gC_Wallet.findUnique({
-                where: { githubId }
-            });
-
-            return { order: refreshedOrder, wallet: currentWallet };
+            return refreshedOrder;
         });
 
-        return response_200(res, 'Order cancelled and refunded', result);
+        return response_200(res, 'Order cancelled successfully', result);
     } catch (error) {
         if (error.message === 'CONCURRENT_MODIFICATION') {
             return response_400(res, 'Order status changed before cancellation could be completed');
         }
-        return response_500(res, 'Error cancelling order', error);
+        return response_500(res, 'Failed to cancel order', error);
     }
 };
 
-export const getMyGeekcoinWallet = async (req, res) => {
-    try {
-        const wallet = await prisma.gC_Wallet.upsert({
-            where: { githubId: req.user.id },
-            update: {},
-            create: { githubId: req.user.id, balance: 0 }
-        });
-
-        return response_200(res, 'Wallet fetched successfully', wallet);
-    } catch (error) {
-        return response_500(res, 'Failed to fetch wallet', error);
-    }
-};
-
-export const getMyGeekcoinTransactions = async (req, res) => {
-    try {
-        const githubId = req.user.id;
-        const { page, limit, skip } = paginate(req, 20, 100);
-
-        const [total, transactions] = await Promise.all([
-            prisma.gC_Transaction.count({ where: { githubId } }),
-            prisma.gC_Transaction.findMany({
-                where: { githubId },
-                orderBy: { createdAt: 'desc' },
-                skip,
-                take: limit
-            })
-        ]);
-
-        return response_200(res, 'Transactions fetched successfully', {
-            transactions,
-            pagination: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit)
-            }
-        });
-    } catch (error) {
-        return response_500(res, 'Failed to fetch transactions', error);
-    }
-};
-
-//Admin Endpoints 
-
+/* ADMIN CATALOG MANAGEMENT */
 export const getAllGeekstoreItems = async (req, res) => {
     try {
-        const { page, limit, skip } = paginate(req, 40, 100);
-        const { category, search, includeInactive, includeDeleted } = req.query;
+        const { page, limit, skip } = paginate(req, 20, 100);
+        const { includeInactive, includeDeleted, category, search } = req.query;
 
-        const where = {
-            ...(includeInactive !== 'true' && { isActive: true }),
-            ...(includeDeleted !== 'true' && { deletedAt: null }),
-            ...(category && { category: String(category).trim() }),
-            ...(search && {
-                OR: [
-                    { name: { contains: String(search).trim() } },
-                    { description: { contains: String(search).trim() } }
-                ]
-            })
-        };
+        const where = {};
+
+        if (includeDeleted !== 'true' && includeDeleted !== true) {
+            where.deletedAt = null;
+        }
+
+        if (includeInactive !== 'true' && includeInactive !== true) {
+            where.isActive = true;
+        }
+
+        if (category && typeof category === 'string' && category.trim()) {
+            where.category = category.trim();
+        }
+
+        if (search && typeof search === 'string' && search.trim()) {
+            where.name = {
+                contains: search.trim()
+            };
+        }
 
         const [total, items] = await Promise.all([
             prisma.gCStoreItem.count({ where }),
@@ -537,11 +974,13 @@ export const getAllGeekstoreItems = async (req, res) => {
 
 export const getGeekstoreItemByIdAdmin = async (req, res) => {
     try {
+        const { itemId } = req.params;
+
         const item = await prisma.gCStoreItem.findUnique({
-            where: { id: req.params.itemId },
+            where: { id: itemId },
             include: {
                 _count: {
-                    select: { orders: true }
+                    select: { orderItems: true, cartItems: true }
                 }
             }
         });
@@ -565,14 +1004,11 @@ export const addGeekstoreItem = async (req, res) => {
         }
 
         const trimmedName = name.trim();
-        let price, stock, cashPrice = null;
+        let price, stock;
 
         try {
             price = parsePositiveInt(req.body.price, 'price');
             stock = parseNonNegativeInt(req.body.stock, 'stock');
-            if (req.body.cashPrice !== undefined && req.body.cashPrice !== null) {
-                cashPrice = parseNonNegativeInt(req.body.cashPrice, 'cashPrice');
-            }
         } catch (err) {
             return response_400(res, err.message);
         }
@@ -592,7 +1028,6 @@ export const addGeekstoreItem = async (req, res) => {
                 imageUrl: imageUrl?.trim() || null,
                 category: category?.trim() || 'Merchandise',
                 price,
-                cashPrice,
                 stock,
                 isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true
             }
@@ -600,9 +1035,6 @@ export const addGeekstoreItem = async (req, res) => {
 
         return response_201(res, 'Item added successfully', item);
     } catch (error) {
-        if (error.code === 'P2002') {
-            return response_400(res, 'An item with this name already exists');
-        }
         return response_500(res, 'Failed to add item', error);
     }
 };
@@ -627,17 +1059,7 @@ export const updateGeekstoreItem = async (req, res) => {
             try {
                 data.price = parsePositiveInt(req.body.price, 'price');
             } catch (err) {
-                return response_400(res, err.message);
-            }
-        }
-
-        if (req.body.cashPrice !== undefined) {
-            try {
-                data.cashPrice = req.body.cashPrice === null
-                    ? null
-                    : parseNonNegativeInt(req.body.cashPrice, 'cashPrice');
-            } catch (err) {
-                return response_400(res, err.message);
+                return response_400(err.message);
             }
         }
 
@@ -666,7 +1088,7 @@ export const updateGeekstoreItem = async (req, res) => {
                 where: { name: data.name, id: { not: itemId }, deletedAt: null }
             });
             if (duplicate) {
-                return response_400(res, 'An item with this name already exists');
+                return response_400(res, 'An active item with this name already exists');
             }
         }
 
@@ -677,9 +1099,6 @@ export const updateGeekstoreItem = async (req, res) => {
 
         return response_200(res, 'Item updated successfully', item);
     } catch (error) {
-        if (error.code === 'P2002') {
-            return response_400(res, 'An item with this name already exists');
-        }
         return response_500(res, 'Failed to update item', error);
     }
 };
@@ -710,31 +1129,50 @@ export const deleteGeekstoreItem = async (req, res) => {
     }
 };
 
+/* ADMIN ORDER MANAGEMENT */
+
 export const getAllGeekstoreOrders = async (req, res) => {
     try {
         const { page, limit, skip } = paginate(req, 20, 100);
-        const { status, githubId, itemId, paymentMethod, paymentStatus, search } = req.query;
+        const { status, paymentStatus, paymentMethod, githubId, search } = req.query;
 
-        const where = {
-            ...(status && { status }),
-            ...(paymentMethod && { paymentMethod }),
-            ...(paymentStatus && { paymentStatus }),
-            ...(githubId && { githubId: String(githubId).trim() }),
-            ...(itemId && { itemId: String(itemId).trim() }),
-            ...(search && {
-                OR: [
-                    { githubId: { contains: String(search).trim() } },
-                    { id: { contains: String(search).trim() } }
-                ]
-            })
-        };
+        const where = {};
+
+        if (status && ORDER_STATUS[status.toUpperCase()]) {
+            where.status = status.toUpperCase();
+        }
+
+        if (paymentStatus && PAYMENT_STATUS[paymentStatus.toUpperCase()]) {
+            where.paymentStatus = paymentStatus.toUpperCase();
+        }
+
+        if (paymentMethod && PAYMENT_METHOD[paymentMethod.toUpperCase()]) {
+            where.paymentMethod = paymentMethod.toUpperCase();
+        }
+
+        if (githubId && typeof githubId === 'string' && githubId.trim()) {
+            where.githubId = githubId.trim();
+        }
+
+        if (search && typeof search === 'string' && search.trim()) {
+            where.OR = [
+                { id: { contains: search.trim() } },
+                { contactNumber: { contains: search.trim() } },
+                { shippingAddress: { contains: search.trim() } }
+            ];
+        }
 
         const [total, orders] = await Promise.all([
             prisma.gCOrder.count({ where }),
             prisma.gCOrder.findMany({
                 where,
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
                 include: {
-                    item: true,
+                    items: {
+                        include: { item: true }
+                    },
                     user: {
                         select: {
                             name: true,
@@ -744,10 +1182,7 @@ export const getAllGeekstoreOrders = async (req, res) => {
                             avatarUrl: true
                         }
                     }
-                },
-                orderBy: { createdAt: 'desc' },
-                skip,
-                take: limit
+                }
             })
         ]);
 
@@ -767,10 +1202,14 @@ export const getAllGeekstoreOrders = async (req, res) => {
 
 export const getGeekstoreOrderByIdAdmin = async (req, res) => {
     try {
+        const { orderId } = req.params;
+
         const order = await prisma.gCOrder.findUnique({
-            where: { id: req.params.orderId },
+            where: { id: orderId },
             include: {
-                item: true,
+                items: {
+                    include: { item: true }
+                },
                 user: {
                     select: {
                         name: true,
@@ -787,7 +1226,7 @@ export const getGeekstoreOrderByIdAdmin = async (req, res) => {
             return response_404(res, 'Order not found');
         }
 
-        return response_200(res, 'Order details fetched successfully', order);
+        return response_200(res, 'Order fetched successfully', order);
     } catch (error) {
         return response_500(res, 'Failed to fetch order', error);
     }
@@ -798,65 +1237,71 @@ export const updateGeekstoreOrderStatus = async (req, res) => {
         const { orderId } = req.params;
         const { status, adminNote } = req.body;
 
-        if (!status || !ORDER_STATUS[status]) {
+        if (!status || !ORDER_STATUS[status.toUpperCase()]) {
             return response_400(
                 res,
                 `Invalid status. Must be one of: ${Object.values(ORDER_STATUS).join(', ')}`
             );
         }
 
+        const targetStatus = status.toUpperCase();
+
         const order = await prisma.gCOrder.findUnique({
-            where: { id: orderId }
+            where: { id: orderId },
+            include: { items: true }
         });
 
         if (!order) {
             return response_404(res, 'Order not found');
         }
 
-        // Terminal status guard
+        // Terminal status guard: once cancelled or rejected, cannot be moved back
         const isTerminal = [ORDER_STATUS.REJECTED, ORDER_STATUS.CANCELLED].includes(order.status);
-        const targetIsActive = ![ORDER_STATUS.REJECTED, ORDER_STATUS.CANCELLED].includes(status);
+        const targetIsActive = ![ORDER_STATUS.REJECTED, ORDER_STATUS.CANCELLED].includes(targetStatus);
         if (isTerminal && targetIsActive) {
             return response_400(res, 'Cannot move rejected or cancelled order back to active');
         }
 
-        const shouldRefund = [ORDER_STATUS.REJECTED, ORDER_STATUS.CANCELLED].includes(status) && !isTerminal;
+        const shouldRestock =
+            [ORDER_STATUS.REJECTED, ORDER_STATUS.CANCELLED].includes(targetStatus) && !isTerminal;
 
         const updatedOrder = await prisma.$transaction(async (tx) => {
-            if (shouldRefund) {
-                if (order.paymentMethod === PAYMENT_METHOD.GEEKCOIN) {
-                    const wallet = await tx.gC_Wallet.upsert({
-                        where: { githubId: order.githubId },
-                        update: { balance: { increment: order.totalPrice } },
-                        create: { githubId: order.githubId, balance: order.totalPrice }
-                    });
-
-                    await tx.gC_Transaction.create({
-                        data: {
-                            walletId: wallet.id,
-                            githubId: order.githubId,
-                            amount: order.totalPrice,
-                            eventName: null,
-                            idempotencyKey: `refund-order-${order.id}`
-                        }
+            if (shouldRestock) {
+                // Restock items
+                for (const orderItem of order.items) {
+                    await tx.gCStoreItem.update({
+                        where: { id: orderItem.itemId },
+                        data: { stock: { increment: orderItem.quantity } }
                     });
                 }
-
-                await tx.gCStoreItem.update({
-                    where: { id: order.itemId },
-                    data: { stock: { increment: order.quantity } }
-                });
             }
 
-            return tx.gCOrder.update({
-                where: { id: orderId },
-                data: {
-                    status,
-                    ...(shouldRefund && { paymentStatus: PAYMENT_STATUS.REFUNDED }),
-                    ...(adminNote !== undefined && { adminNote: String(adminNote).trim() })
+            // Concurrency guard with status check
+            const updateResult = await tx.gCOrder.updateMany({
+                where: {
+                    id: orderId,
+                    status: order.status
                 },
+                data: {
+                    status: targetStatus,
+                    ...(shouldRestock &&
+                        order.paymentStatus === PAYMENT_STATUS.COMPLETED && {
+                            paymentStatus: PAYMENT_STATUS.REFUNDED
+                        }),
+                    ...(adminNote !== undefined && { adminNote: String(adminNote).trim() })
+                }
+            });
+
+            if (!updateResult.count) {
+                throw new Error('ORDER_ALREADY_MODIFIED');
+            }
+
+            return tx.gCOrder.findUnique({
+                where: { id: orderId },
                 include: {
-                    item: true,
+                    items: {
+                        include: { item: true }
+                    },
                     user: {
                         select: {
                             name: true,
@@ -872,80 +1317,59 @@ export const updateGeekstoreOrderStatus = async (req, res) => {
 
         return response_200(res, 'Order status updated', updatedOrder);
     } catch (error) {
+        if (error.message === 'ORDER_ALREADY_MODIFIED') {
+            return response_400(
+                res,
+                'Order was already modified by another request. Please refresh and retry.'
+            );
+        }
         return response_500(res, 'Failed to update order status', error);
     }
 };
 
-export const adjustGeekcoinWallet = async (req, res) => {
+export const updateGeekstoreOrderPaymentStatus = async (req, res) => {
     try {
-        const { githubId } = req.params;
-        const { amount, reason } = req.body;
+        const { orderId } = req.params;
+        const { paymentStatus, adminNote } = req.body;
 
-        if (!githubId || typeof githubId !== 'string' || !githubId.trim()) {
-            return response_400(res, 'githubId is required');
+        if (!paymentStatus || !PAYMENT_STATUS[paymentStatus.toUpperCase()]) {
+            return response_400(
+                res,
+                `Invalid paymentStatus. Allowed: ${Object.values(PAYMENT_STATUS).join(', ')}`
+            );
         }
 
-        const targetUser = githubId.trim();
-        const delta = Number(amount);
-        if (!Number.isInteger(delta) || delta === 0) {
-            return response_400(res, 'amount must be a non-zero integer');
-        }
+        const targetPaymentStatus = paymentStatus.toUpperCase();
 
-        const rawIdempotency = req.headers['x-idempotency-key'];
-        const idempotencyKey = typeof rawIdempotency === 'string' && rawIdempotency.trim()
-            ? rawIdempotency.trim()
-            : `adjust-${targetUser}-${Date.now()}`;
-
-        const result = await prisma.$transaction(async (tx) => {
-            let wallet = await tx.gC_Wallet.findUnique({
-                where: { githubId: targetUser }
-            });
-
-            if (!wallet) {
-                if (delta < 0) {
-                    throw new Error('NEGATIVE_OPENING_BALANCE');
-                }
-                wallet = await tx.gC_Wallet.create({
-                    data: { githubId: targetUser, balance: delta }
-                });
-            } else {
-                if (delta < 0 && wallet.balance < Math.abs(delta)) {
-                    throw new Error('INSUFFICIENT_FUNDS');
-                }
-                wallet = await tx.gC_Wallet.update({
-                    where: { id: wallet.id },
-                    data: { balance: { increment: delta } }
-                });
-            }
-
-            const transaction = await tx.gC_Transaction.create({
-                data: {
-                    walletId: wallet.id,
-                    githubId: targetUser,
-                    amount: delta,
-                    eventName: null,
-                    idempotencyKey
-                }
-            });
-
-            return {
-                wallet,
-                transaction,
-                reason: reason || null
-            };
+        const order = await prisma.gCOrder.findUnique({
+            where: { id: orderId }
         });
 
-        return response_200(res, 'Wallet adjusted successfully', result);
+        if (!order) {
+            return response_404(res, 'Order not found');
+        }
+
+        const updatedOrder = await prisma.gCOrder.update({
+            where: { id: orderId },
+            data: {
+                paymentStatus: targetPaymentStatus,
+                ...(adminNote !== undefined && { adminNote: String(adminNote).trim() })
+            },
+            include: {
+                items: { include: { item: true } },
+                user: {
+                    select: {
+                        name: true,
+                        email: true,
+                        githubId: true,
+                        college: true
+                    }
+                }
+            }
+        });
+
+        return response_200(res, 'Payment status updated successfully', updatedOrder);
     } catch (error) {
-        if (error.message === 'NEGATIVE_OPENING_BALANCE') {
-            return response_400(res, 'Cannot create wallet with negative balance');
-        }
-        if (error.message === 'INSUFFICIENT_FUNDS') {
-            return response_400(res, 'User balance is insufficient for this deduction');
-        }
-        if (error.code === 'P2002') {
-            return response_400(res, 'Duplicate adjustment request detected');
-        }
-        return response_500(res, 'Error adjusting wallet', error);
+        return response_500(res, 'Failed to update payment status', error);
     }
 };

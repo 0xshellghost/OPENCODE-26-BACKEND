@@ -25,7 +25,7 @@ import {
     getAllGeekstoreOrders,
     getGeekstoreOrderByIdAdmin,
     updateGeekstoreOrderStatus,
-    adjustGeekcoinWallet
+    updateGeekstoreOrderPaymentStatus
 } from '../../controllers/geekstore.controller.js';
 import { participantIssues } from '../../controllers/participant.controller.js';
 import {
@@ -89,8 +89,7 @@ router.delete('/geekstore/items/:itemId/delete', deleteGeekstoreItem);
 router.get('/geekstore/orders', getAllGeekstoreOrders);
 router.get('/geekstore/orders/:orderId', getGeekstoreOrderByIdAdmin);
 router.patch('/geekstore/orders/:orderId/status', updateGeekstoreOrderStatus);
-
-router.patch('/geekstore/wallet/:githubId/adjust', adjustGeekcoinWallet);
+router.patch('/geekstore/orders/:orderId/payment', updateGeekstoreOrderPaymentStatus);
 
 // Backward-compatible event-prefixed aliases
 router.post('/event/:eventName/geekstore/add', addGeekstoreItem);

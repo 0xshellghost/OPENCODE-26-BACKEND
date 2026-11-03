@@ -30,6 +30,7 @@ model User {
   Admin          Admin?
   Participant    Participant?
   GCOrders       GCOrder[]
+  GCCart         GCCart?
 
   @@index([githubId])
 }
@@ -186,6 +187,7 @@ model GC_Transaction {
   walletId       String    @map("wallet_id")
   githubId       String    @map("github_id")
   amount         Int
+  reason         String?   @db.Text
   eventName      String?   @map("event_name")
   idempotencyKey String?   @map("idempotency_key")
   createdAt      DateTime  @default(now())
@@ -199,54 +201,95 @@ model GC_Transaction {
 }
 
 model GCStoreItem {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  description String?   @db.Text
-  imageUrl    String?   @map("image_url")
-  category    String?   @default("Merchandise")
-  price       Int
-  cashPrice   Int?      @map("cash_price")
-  stock       Int       @default(0)
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime? @map("deleted_at")
-  orders      GCOrder[]
+  id          String        @id @default(uuid())
+  name        String
+  description String?       @db.Text
+  imageUrl    String?       @map("image_url")
+  category    String?       @default("Merchandise")
+  price       Int           // Price in INR / cash currency
+  stock       Int           @default(0)
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?     @map("deleted_at")
+  orderItems  GCOrderItem[]
+  cartItems   GCCartItem[]
 
   @@index([isActive, deletedAt])
   @@index([category])
+  @@index([name])
   @@map("gc_store_item")
+}
+
+model GCCart {
+  id        String       @id @default(uuid())
+  githubId  String       @unique @map("github_id")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  items     GCCartItem[]
+  user      User?        @relation(fields: [githubId], references: [githubId])
+
+  @@map("gc_cart")
+}
+
+model GCCartItem {
+  id        String      @id @default(uuid())
+  cartId    String      @map("cart_id")
+  itemId    String      @map("item_id")
+  quantity  Int         @default(1)
+  size      String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  cart      GCCart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  item      GCStoreItem @relation(fields: [itemId], references: [id])
+
+  @@unique([cartId, itemId, size])
+  @@index([cartId])
+  @@index([itemId])
+  @@map("gc_cart_item")
 }
 
 model GCOrder {
   id               String        @id @default(uuid())
-  itemId           String        @map("item_id")
   githubId         String        @map("github_id")
-  quantity         Int           @default(1)
-  unitPrice        Int           @map("unit_price")
-  totalPrice       Int           @map("total_price")
-  currency         String        @default("GC")
-  paymentMethod    PaymentMethod @default(GEEKCOIN) @map("payment_method")
-  paymentStatus    PaymentStatus @default(COMPLETED) @map("payment_status")
+  totalAmount      Int           @map("total_amount")
+  currency         String        @default("INR")
+  paymentMethod    PaymentMethod @default(CASH) @map("payment_method")
+  paymentStatus    PaymentStatus @default(PENDING) @map("payment_status")
   gatewayOrderId   String?       @map("gateway_order_id")
   gatewayPaymentId String?       @map("gateway_payment_id")
   status           GCOrderStatus @default(PLACED)
   shippingAddress  String?       @map("shipping_address") @db.Text
   contactNumber    String?       @map("contact_number")
-  size             String?
   userNote         String?       @map("user_note") @db.Text
   adminNote        String?       @map("admin_note") @db.Text
   idempotencyKey   String?       @unique @map("idempotency_key")
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
-  item             GCStoreItem   @relation(fields: [itemId], references: [id])
+  items            GCOrderItem[]
   user             User?         @relation(fields: [githubId], references: [githubId])
 
   @@index([githubId, createdAt])
-  @@index([itemId])
   @@index([status])
   @@index([paymentStatus])
   @@map("gc_order")
+}
+
+model GCOrderItem {
+  id         String      @id @default(uuid())
+  orderId    String      @map("order_id")
+  itemId     String      @map("item_id")
+  quantity   Int         @default(1)
+  unitPrice  Int         @map("unit_price")
+  totalPrice Int         @map("total_price")
+  size       String?
+  createdAt  DateTime    @default(now())
+  order      GCOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item       GCStoreItem @relation(fields: [itemId], references: [id])
+
+  @@index([orderId])
+  @@index([itemId])
+  @@map("gc_order_item")
 }
 
 enum LeaderboardEventType {
@@ -278,9 +321,10 @@ enum GCOrderStatus {
 }
 
 enum PaymentMethod {
-  GEEKCOIN
+  CASH
   RAZORPAY
   STRIPE
+  COD
   OTHER
 }
 

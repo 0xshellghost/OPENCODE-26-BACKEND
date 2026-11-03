@@ -3,12 +3,16 @@ import userAuth from '../../middlewares/userAuth.middleware.js';
 import {
     listGeekstoreItems,
     getGeekstoreItemById,
-    redeemGeekstoreItem,
+    getMyCart,
+    addToCart,
+    updateCartItem,
+    removeCartItem,
+    clearCart,
+    checkoutCart,
+    createDirectOrder,
     getMyGeekstoreOrders,
     getMyGeekstoreOrderById,
-    cancelMyGeekstoreOrder,
-    getMyGeekcoinWallet,
-    getMyGeekcoinTransactions
+    cancelMyGeekstoreOrder
 } from '../../controllers/geekstore.controller.js';
 
 const router = express.Router();
@@ -18,17 +22,20 @@ router.get('/', listGeekstoreItems);
 router.get('/items', listGeekstoreItems);
 router.get('/items/:itemId', getGeekstoreItemById);
 
-// Redemption routes (Authenticated User)
-router.post('/items/:itemId/redeem', userAuth, redeemGeekstoreItem);
-router.post('/redeem/:itemId', userAuth, redeemGeekstoreItem);
+// Cart routes (Authenticated User)
+router.get('/cart', userAuth, getMyCart);
+router.post('/cart/items', userAuth, addToCart);
+router.patch('/cart/items/:cartItemId', userAuth, updateCartItem);
+router.delete('/cart/items/:cartItemId', userAuth, removeCartItem);
+router.delete('/cart', userAuth, clearCart);
+router.post('/cart/checkout', userAuth, checkoutCart);
 
-// User orders routes (Authenticated User)
+// Direct Purchase ("Buy Now") route (Authenticated User)
+router.post('/items/:itemId/buy', userAuth, createDirectOrder);
+
+// User Order routes (Authenticated User)
 router.get('/orders/me', userAuth, getMyGeekstoreOrders);
 router.get('/orders/:orderId', userAuth, getMyGeekstoreOrderById);
 router.post('/orders/:orderId/cancel', userAuth, cancelMyGeekstoreOrder);
-
-// Wallet and transaction routes (Authenticated User)
-router.get('/wallet/me', userAuth, getMyGeekcoinWallet);
-router.get('/wallet/transactions/me', userAuth, getMyGeekcoinTransactions);
 
 export default router;

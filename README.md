@@ -123,23 +123,27 @@ All routes below are under `/api/v1`.
 - `GET /admin/:eventName/:participantId/issues?repoName=...` : Participant issues (admin view)
 - `GET /admin/geekstore/items` : List Geekstore items (supports `includeInactive`, `includeDeleted`, `category`, `search`, pagination)
 - `GET /admin/geekstore/items/:itemId` : Get Geekstore item details with order stats
-- `POST /admin/geekstore/items` : Add new Geekstore item
+- `POST /admin/geekstore/items` : Add new Geekstore item (name, description, imageUrl, category, price, stock, isActive)
 - `PATCH /admin/geekstore/items/:itemId` : Update Geekstore item
 - `DELETE /admin/geekstore/items/:itemId` : Soft delete Geekstore item
-- `GET /admin/geekstore/orders` : List Geekstore orders across portal (supports `status`, `githubId`, `itemId`, `search`, pagination)
-- `GET /admin/geekstore/orders/:orderId` : Get single order details with user & item info
-- `PATCH /admin/geekstore/orders/:orderId/status` : Update Geekstore order status (PLACED, APPROVED, FULFILLED, REJECTED, CANCELLED) with auto-refund on reject/cancel
-- `PATCH /admin/geekstore/wallet/:githubId/adjust` : Adjust participant Geekcoin wallet balance
+- `GET /admin/geekstore/orders` : List Geekstore orders across portal (supports `status`, `paymentStatus`, `paymentMethod`, `githubId`, `search`, pagination)
+- `GET /admin/geekstore/orders/:orderId` : Get single order details with user & items info
+- `PATCH /admin/geekstore/orders/:orderId/status` : Update Geekstore order status (PLACED, APPROVED, FULFILLED, REJECTED, CANCELLED) with auto-restock on reject/cancel
+- `PATCH /admin/geekstore/orders/:orderId/payment` : Update order payment status (PENDING, COMPLETED, FAILED, REFUNDED)
 
 ### Geekstore (also mounted on `/user/geekstore`)
 - `GET /geekstore/items` (or `/geekstore`) : List active merchandise catalog (supports `category`, `search`, `inStockOnly`, pagination)
 - `GET /geekstore/items/:itemId` : Get item details
-- `POST /geekstore/items/:itemId/redeem` (or `/geekstore/redeem/:itemId`) : Redeem item with Geekcoins (requires auth, supports `quantity`, `size`, `shippingAddress`, `contactNumber`, `userNote`, `x-idempotency-key`)
-- `GET /geekstore/orders/me` : Get logged-in user's orders (requires auth, supports `status`, pagination)
-- `GET /geekstore/orders/:orderId` : Get specific order details (requires auth)
-- `POST /geekstore/orders/:orderId/cancel` : Cancel order if in `PLACED` status with auto-refund and stock restoration (requires auth)
-- `GET /geekstore/wallet/me` : Get logged-in user's Geekcoin wallet balance (requires auth)
-- `GET /geekstore/wallet/transactions/me` : Get logged-in user's wallet transactions (requires auth, supports `page`, `limit`)
+- `GET /geekstore/cart` : Get logged-in user's cart with items, calculated totals, and availability status (requires auth)
+- `POST /geekstore/cart/items` : Add item to cart (requires auth, body: `itemId`, `quantity`, `size`)
+- `PATCH /geekstore/cart/items/:cartItemId` : Update cart item quantity or size (requires auth)
+- `DELETE /geekstore/cart/items/:cartItemId` : Remove specific item from cart (requires auth)
+- `DELETE /geekstore/cart` : Clear all items from cart (requires auth)
+- `POST /geekstore/cart/checkout` : Checkout entire cart with Cash/payment gateway (requires auth, supports `shippingAddress`, `contactNumber`, `paymentMethod`, `userNote`, `x-idempotency-key`)
+- `POST /geekstore/items/:itemId/buy` : Direct purchase ("Buy Now") without adding to cart first (requires auth, supports `quantity`, `size`, `shippingAddress`, `contactNumber`, `paymentMethod`, `userNote`, `x-idempotency-key`)
+- `GET /geekstore/orders/me` : Get logged-in user's orders with items (requires auth, supports `status`, pagination)
+- `GET /geekstore/orders/:orderId` : Get specific order details with items (requires auth)
+- `POST /geekstore/orders/:orderId/cancel` : Cancel order if in `PLACED` status with stock restoration (requires auth)
 
 ### Leaderboard
 - `GET /leaderboard/health` : Health check

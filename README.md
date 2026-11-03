@@ -121,6 +121,25 @@ All routes below are under `/api/v1`.
 - `POST /admin/:userId/addAdmin` : Grant admin role
 - `PATCH /admin/modify` : Increment PR points
 - `GET /admin/:eventName/:participantId/issues?repoName=...` : Participant issues (admin view)
+- `GET /admin/geekstore/items` : List Geekstore items (supports `includeInactive`, `includeDeleted`, `category`, `search`, pagination)
+- `GET /admin/geekstore/items/:itemId` : Get Geekstore item details with order stats
+- `POST /admin/geekstore/items` : Add new Geekstore item
+- `PATCH /admin/geekstore/items/:itemId` : Update Geekstore item
+- `DELETE /admin/geekstore/items/:itemId` : Soft delete Geekstore item
+- `GET /admin/geekstore/orders` : List Geekstore orders across portal (supports `status`, `githubId`, `itemId`, `search`, pagination)
+- `GET /admin/geekstore/orders/:orderId` : Get single order details with user & item info
+- `PATCH /admin/geekstore/orders/:orderId/status` : Update Geekstore order status (PLACED, APPROVED, FULFILLED, REJECTED, CANCELLED) with auto-refund on reject/cancel
+- `PATCH /admin/geekstore/wallet/:githubId/adjust` : Adjust participant Geekcoin wallet balance
+
+### Geekstore (also mounted on `/user/geekstore`)
+- `GET /geekstore/items` (or `/geekstore`) : List active merchandise catalog (supports `category`, `search`, `inStockOnly`, pagination)
+- `GET /geekstore/items/:itemId` : Get item details
+- `POST /geekstore/items/:itemId/redeem` (or `/geekstore/redeem/:itemId`) : Redeem item with Geekcoins (requires auth, supports `quantity`, `size`, `shippingAddress`, `contactNumber`, `userNote`, `x-idempotency-key`)
+- `GET /geekstore/orders/me` : Get logged-in user's orders (requires auth, supports `status`, pagination)
+- `GET /geekstore/orders/:orderId` : Get specific order details (requires auth)
+- `POST /geekstore/orders/:orderId/cancel` : Cancel order if in `PLACED` status with auto-refund and stock restoration (requires auth)
+- `GET /geekstore/wallet/me` : Get logged-in user's Geekcoin wallet balance (requires auth)
+- `GET /geekstore/wallet/transactions/me` : Get logged-in user's wallet transactions (requires auth, supports `page`, `limit`)
 
 ### Leaderboard
 - `GET /leaderboard/health` : Health check

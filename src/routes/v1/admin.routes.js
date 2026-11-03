@@ -16,8 +16,22 @@ import {
     addMentorRole,
     removeMentorRole
 } from '../../controllers/admin.controller.js';
+import {
+    addGeekstoreItem,
+    updateGeekstoreItem,
+    deleteGeekstoreItem,
+    getAllGeekstoreItems,
+    getGeekstoreItemByIdAdmin,
+    getAllGeekstoreOrders,
+    getGeekstoreOrderByIdAdmin,
+    updateGeekstoreOrderStatus,
+    adjustGeekcoinWallet
+} from '../../controllers/geekstore.controller.js';
 import { participantIssues } from '../../controllers/participant.controller.js';
-import { eventUploader, fileUploader } from '../../middlewares/imageUpload.middleware.js';
+import {
+    eventUploader,
+    fileUploader
+} from '../../middlewares/imageUpload.middleware.js';
 
 const router = express.Router();
 
@@ -56,6 +70,40 @@ router.patch('/modify/', incrementPoints);
 router.get('/:eventName/:participantId/issues', participantIssues); //repo id as query param
 
 // Upload event leaderboard from SQL script
-router.post('/event/:eventName/leaderboard/upload', fileUploader, uploadLeaderboard);
+router.post(
+    '/event/:eventName/leaderboard/upload',
+    fileUploader,
+    uploadLeaderboard
+);
+
+// Geekstore Admin Routes (Platform-wide)
+router.get('/geekstore/items', getAllGeekstoreItems);
+router.get('/geekstore/items/:itemId', getGeekstoreItemByIdAdmin);
+router.post('/geekstore/items', addGeekstoreItem);
+router.post('/geekstore/items/add', addGeekstoreItem);
+router.patch('/geekstore/items/:itemId', updateGeekstoreItem);
+router.patch('/geekstore/items/:itemId/update', updateGeekstoreItem);
+router.delete('/geekstore/items/:itemId', deleteGeekstoreItem);
+router.delete('/geekstore/items/:itemId/delete', deleteGeekstoreItem);
+
+router.get('/geekstore/orders', getAllGeekstoreOrders);
+router.get('/geekstore/orders/:orderId', getGeekstoreOrderByIdAdmin);
+router.patch('/geekstore/orders/:orderId/status', updateGeekstoreOrderStatus);
+
+router.patch('/geekstore/wallet/:githubId/adjust', adjustGeekcoinWallet);
+
+// Backward-compatible event-prefixed aliases
+router.post('/event/:eventName/geekstore/add', addGeekstoreItem);
+router.patch('/event/:eventName/geekstore/:itemId/update', updateGeekstoreItem);
+router.delete(
+    '/event/:eventName/geekstore/:itemId/delete',
+    deleteGeekstoreItem
+);
+router.get('/event/:eventName/geekstore', getAllGeekstoreItems);
+router.get('/event/:eventName/geekstore/orders', getAllGeekstoreOrders);
+router.patch(
+    '/event/:eventName/geekstore/orders/:orderId/status',
+    updateGeekstoreOrderStatus
+);
 
 export default router;

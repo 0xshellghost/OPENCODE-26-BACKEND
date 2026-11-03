@@ -5,6 +5,7 @@ import eventRouter from './events.routes.js';
 import registerRouter from './register.routes.js';
 import adminRouter from './admin.routes.js';
 import leaderRouter from './leaderboard.routes.js';
+import geekstoreRouter from './geekstore.routes.js';
 import { response_200 } from '../../utils/responseCodes.js';
 import { routerFunction } from '../../controllers/githubBot.controller.js';
 import { isAdmin } from '../../middlewares/isAdmin.middleware.js';
@@ -21,13 +22,15 @@ router.use('/participant', participantRouter);
 router.use('/events', eventRouter);
 router.use('/register', registerRouter);
 router.use('/admin', userAuth, isAdmin, adminRouter);
-router.use('/leaderboard', leaderRouter)
+router.use('/leaderboard', leaderRouter);
+router.use('/geekstore', geekstoreRouter);
+router.use('/user/geekstore', geekstoreRouter);
 
 router.post('/github-bot', signatureVerification, routerFunction);
 router.get('/detail/:type/:id', getDetail);
 
 router.get('/', (req, res) => {
     res.send('<h1>V1 this iss...<h1>');
-})
+});
 
 export default router;

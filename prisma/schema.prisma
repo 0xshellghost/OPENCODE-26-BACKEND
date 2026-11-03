@@ -29,6 +29,7 @@ model User {
   year           String       @db.VarChar(20)
   Admin          Admin?
   Participant    Participant?
+  GCOrders       GCOrder[]
 
   @@index([githubId])
 }
@@ -190,10 +191,62 @@ model GC_Transaction {
   createdAt      DateTime  @default(now())
   wallet         GC_Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
+  @@unique([idempotencyKey])
   @@index([walletId])
   @@index([githubId])
   @@index([eventName])
   @@map("gc_transaction")
+}
+
+model GCStoreItem {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?   @db.Text
+  imageUrl    String?   @map("image_url")
+  category    String?   @default("Merchandise")
+  price       Int
+  cashPrice   Int?      @map("cash_price")
+  stock       Int       @default(0)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? @map("deleted_at")
+  orders      GCOrder[]
+
+  @@index([isActive, deletedAt])
+  @@index([category])
+  @@map("gc_store_item")
+}
+
+model GCOrder {
+  id               String        @id @default(uuid())
+  itemId           String        @map("item_id")
+  githubId         String        @map("github_id")
+  quantity         Int           @default(1)
+  unitPrice        Int           @map("unit_price")
+  totalPrice       Int           @map("total_price")
+  currency         String        @default("GC")
+  paymentMethod    PaymentMethod @default(GEEKCOIN) @map("payment_method")
+  paymentStatus    PaymentStatus @default(COMPLETED) @map("payment_status")
+  gatewayOrderId   String?       @map("gateway_order_id")
+  gatewayPaymentId String?       @map("gateway_payment_id")
+  status           GCOrderStatus @default(PLACED)
+  shippingAddress  String?       @map("shipping_address") @db.Text
+  contactNumber    String?       @map("contact_number")
+  size             String?
+  userNote         String?       @map("user_note") @db.Text
+  adminNote        String?       @map("admin_note") @db.Text
+  idempotencyKey   String?       @unique @map("idempotency_key")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  item             GCStoreItem   @relation(fields: [itemId], references: [id])
+  user             User?         @relation(fields: [githubId], references: [githubId])
+
+  @@index([githubId, createdAt])
+  @@index([itemId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@map("gc_order")
 }
 
 enum LeaderboardEventType {
@@ -214,4 +267,26 @@ enum PRStatus {
   MERGED
   OPENED
   REJECTED
+}
+
+enum GCOrderStatus {
+  PLACED
+  APPROVED
+  FULFILLED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  GEEKCOIN
+  RAZORPAY
+  STRIPE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
 }

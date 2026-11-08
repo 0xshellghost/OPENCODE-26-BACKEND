@@ -1,4 +1,4 @@
-import prisma from '../config/prisma.config.js';
+import prisma from '../config/db.config.js';
 import {
     response_200,
     response_201,

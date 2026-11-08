@@ -7,7 +7,7 @@ const dateToYMD = (d) => d.toISOString().slice(0, 10);
 
 export const getLeaderboardProgress = async (req, res) => {
   try {
-    const { eventName } = req.query;
+    const { eventName, topN, limit } = req.query;
     if (!eventName) return response_500(res, 'Missing eventName');
 
     const currentUserGithubId = req.user?.id || null;
@@ -22,7 +22,8 @@ export const getLeaderboardProgress = async (req, res) => {
               select: {
                 name: true,
                 avatarUrl: true,
-                githubId: true
+                githubId: true,
+                college: true
               }
             }
           }
@@ -49,6 +50,7 @@ export const getLeaderboardProgress = async (req, res) => {
           githubId: e.participant?.User?.githubId ?? null,
           name: e.participant?.User?.name ?? pid,
           avatarUrl: e.participant?.User?.avatarUrl ?? null,
+          college: e.participant?.User?.college ?? null,
           data: [],
           _total: 0 // internal accumulator
         });
@@ -76,24 +78,59 @@ export const getLeaderboardProgress = async (req, res) => {
     //Sort by final score
     list.sort((a, b) => b.finalPoints - a.finalPoints);
 
-    const TOP_N = 5;
-    let topList = list.slice(0, TOP_N);
+    const requestedParam = topN !== undefined ? topN : limit;
+    const isAll =
+      requestedParam === 'all' ||
+      requestedParam === 'ALL' ||
+      requestedParam === '0' ||
+      requestedParam === 0;
 
-    if (
-      currentUserGithubId &&
-      !topList.some(p => p.participantId === currentUserGithubId)
-    ) {
-      const currentUserData = list.find(
-        p => p.participantId === currentUserGithubId
-      );
-      if (currentUserData) {
-        topList.push(currentUserData);
+    let resultList = list;
+
+    if (!isAll) {
+      const parsedN = parseInt(requestedParam, 10);
+      const targetN = !isNaN(parsedN) && parsedN > 0 ? parsedN : 5;
+
+      // Group scores by college to identify the top N colleges
+      const collegeScores = new Map();
+      for (const p of list) {
+        const col = (p.college && p.college.trim()) || 'Unknown College';
+        collegeScores.set(col, (collegeScores.get(col) || 0) + p.finalPoints);
+      }
+
+      const sortedColleges = Array.from(collegeScores.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, targetN)
+        .map(([col]) => col);
+
+      const topCollegesSet = new Set(sortedColleges);
+
+      resultList = list.filter(p => {
+        const col = (p.college && p.college.trim()) || 'Unknown College';
+        return topCollegesSet.has(col);
+      });
+
+      // Fallback if no colleges matched
+      if (!resultList.length) {
+        resultList = list.slice(0, targetN);
+      }
+
+      if (
+        currentUserGithubId &&
+        !resultList.some(p => p.participantId === currentUserGithubId)
+      ) {
+        const currentUserData = list.find(
+          p => p.participantId === currentUserGithubId
+        );
+        if (currentUserData) {
+          resultList.push(currentUserData);
+        }
       }
     }
 
-    topList = topList.map(({ finalPoints, githubId, ...rest }) => rest);
+    resultList = resultList.map(({ finalPoints, githubId, ...rest }) => rest);
 
-    return response_200(res, 'OK', topList);
+    return response_200(res, 'OK', resultList);
   } catch (error) {
     console.error(error);
     return response_500(res, 'Error', error);

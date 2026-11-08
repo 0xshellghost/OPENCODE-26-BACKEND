@@ -25,4 +25,21 @@ const userAuth = async (req, res, next) => {
     }
 };
 
+export const optionalUserAuth = async (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) {
+        return next();
+    }
+    try {
+        const token = authHeader.split(' ')[1];
+        if (token) {
+            const payload = jwt.verify(token, process.env.JWT_SECRET);
+            req.user = { id: payload.id, roles: payload.roles };
+        }
+    } catch (error) {
+        req.user = null;
+    }
+    next();
+};
+
 export default userAuth;

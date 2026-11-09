@@ -29,11 +29,20 @@ import {
 } from '../../controllers/geekstore.controller.js';
 import { participantIssues } from '../../controllers/participant.controller.js';
 import {
+    getPlatformFeatures,
+    updatePlatformFeatures
+} from '../../controllers/features.controller.js';
+import {
     eventUploader,
     fileUploader
 } from '../../middlewares/imageUpload.middleware.js';
 
 const router = express.Router();
+
+// Platform Feature Flags (Tab Visibility)
+router.get('/features', getPlatformFeatures);
+router.patch('/features', updatePlatformFeatures);
+router.put('/features', updatePlatformFeatures);
 
 // Flagship Event Routes
 router.put('/events/:eventName/flagship', setFlagshipEvent);

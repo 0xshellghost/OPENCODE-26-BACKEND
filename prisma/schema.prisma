@@ -334,3 +334,16 @@ enum PaymentStatus {
   FAILED
   REFUNDED
 }
+
+model PlatformFeature {
+  id               Int      @id @default(1)
+  showWinners      Boolean  @default(true)
+  showMilestones   Boolean  @default(true)
+  showLeaderboard  Boolean  @default(true)
+  showRepositories Boolean  @default(true)
+  showRPlace       Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("platform_feature")
+}

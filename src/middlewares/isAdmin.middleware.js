@@ -4,7 +4,7 @@ export async function isAdmin(req, res, next) {
     try {
         //console.log(req.user);
         if (!req.user.roles.isAdmin) {
-            response_403(res, 'Only admin can access');
+            return response_403(res, 'Only admin can access');
         }
         next();
     } catch (error) {

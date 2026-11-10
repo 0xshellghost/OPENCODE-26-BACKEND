@@ -1,3 +1,5 @@
+import cloudinary from "../config/cloudinary.config.js";
+import { getDataURI } from "../utils/dataURIparser.js";
 import prisma from '../config/db.config.js';
 import {
     response_200,
@@ -995,9 +997,79 @@ export const getGeekstoreItemByIdAdmin = async (req, res) => {
     }
 };
 
+export const uploadGeekstoreImage = async (req, res) => {
+    try {
+        const file = req.file || (req.files && req.files[0]);
+        if (!file) {
+            return response_400(res, "Please provide an image file to upload");
+        }
+
+        const dataUri = await getDataURI(file);
+        const folder = req.body?.folder?.trim() || "geekstore";
+
+        const uploadResult = await cloudinary.uploader.upload(dataUri.content, {
+            resource_type: "image",
+            folder,
+            overwrite: true
+        });
+
+        return response_200(res, "Image uploaded successfully to Cloudinary", {
+            url: uploadResult.secure_url,
+            publicId: uploadResult.public_id,
+            format: uploadResult.format,
+            width: uploadResult.width,
+            height: uploadResult.height,
+            bytes: uploadResult.bytes
+        });
+    } catch (error) {
+        return response_500(res, "Failed to upload image to Cloudinary", error);
+    }
+};
+
+export const restoreGeekstoreItem = async (req, res) => {
+    try {
+        const { itemId } = req.params;
+
+        const existing = await prisma.gCStoreItem.findUnique({
+            where: { id: itemId }
+        });
+
+        if (!existing) {
+            return response_404(res, "Item not found");
+        }
+
+        const item = await prisma.gCStoreItem.update({
+            where: { id: itemId },
+            data: {
+                deletedAt: null,
+                isActive: true
+            }
+        });
+
+        return response_200(res, "Item restored successfully", item);
+    } catch (error) {
+        return response_500(res, "Failed to restore item", error);
+    }
+};
+
 export const addGeekstoreItem = async (req, res) => {
     try {
-        const { name, description, imageUrl, category } = req.body;
+        let { name, description, imageUrl, category } = req.body;
+
+        const file = req.file || (req.files && req.files[0]);
+        if (file) {
+            try {
+                const dataUri = await getDataURI(file);
+                const uploadResult = await cloudinary.uploader.upload(dataUri.content, {
+                    resource_type: "image",
+                    folder: "geekstore",
+                    overwrite: true
+                });
+                imageUrl = uploadResult.secure_url;
+            } catch (err) {
+                console.error("Cloudinary upload failed in addGeekstoreItem:", err);
+            }
+        }
 
         if (!name || typeof name !== 'string' || !name.trim()) {
             return response_400(res, 'Item name is required');
@@ -1106,13 +1178,48 @@ export const updateGeekstoreItem = async (req, res) => {
 export const deleteGeekstoreItem = async (req, res) => {
     try {
         const { itemId } = req.params;
+        const permanent =
+            req.query.permanent === "true" ||
+            req.query.permanent === true ||
+            req.body?.permanent === true;
 
-        const existing = await prisma.gCStoreItem.findFirst({
-            where: { id: itemId, deletedAt: null }
+        const existing = await prisma.gCStoreItem.findUnique({
+            where: { id: itemId }
         });
 
         if (!existing) {
-            return response_404(res, 'Item not found');
+            return response_404(res, "Item not found");
+        }
+
+        if (permanent) {
+            const orderItemsCount = await prisma.gCOrderItem.count({
+                where: { itemId }
+            });
+
+            if (orderItemsCount > 0) {
+                const item = await prisma.gCStoreItem.update({
+                    where: { id: itemId },
+                    data: {
+                        deletedAt: new Date(),
+                        isActive: false
+                    }
+                });
+                return response_200(
+                    res,
+                    "Item has associated orders and was soft-deleted to preserve order history",
+                    item
+                );
+            }
+
+            await prisma.gCCartItem.deleteMany({
+                where: { itemId }
+            });
+
+            const deleted = await prisma.gCStoreItem.delete({
+                where: { id: itemId }
+            });
+
+            return response_200(res, "Item permanently deleted successfully", deleted);
         }
 
         const item = await prisma.gCStoreItem.update({
@@ -1123,9 +1230,9 @@ export const deleteGeekstoreItem = async (req, res) => {
             }
         });
 
-        return response_200(res, 'Item deleted successfully', item);
+        return response_200(res, "Item deleted successfully", item);
     } catch (error) {
-        return response_500(res, 'Failed to delete item', error);
+        return response_500(res, "Failed to delete item", error);
     }
 };
 

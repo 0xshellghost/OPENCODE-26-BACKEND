@@ -20,6 +20,8 @@ import {
     addGeekstoreItem,
     updateGeekstoreItem,
     deleteGeekstoreItem,
+    restoreGeekstoreItem,
+    uploadGeekstoreImage,
     getAllGeekstoreItems,
     getGeekstoreItemByIdAdmin,
     getAllGeekstoreOrders,
@@ -34,7 +36,8 @@ import {
 } from '../../controllers/features.controller.js';
 import {
     eventUploader,
-    fileUploader
+    fileUploader,
+    geekstoreImageUploader
 } from '../../middlewares/imageUpload.middleware.js';
 
 const router = express.Router();
@@ -88,12 +91,18 @@ router.post(
 // Geekstore Admin Routes (Platform-wide)
 router.get('/geekstore/items', getAllGeekstoreItems);
 router.get('/geekstore/items/:itemId', getGeekstoreItemByIdAdmin);
-router.post('/geekstore/items', addGeekstoreItem);
-router.post('/geekstore/items/add', addGeekstoreItem);
-router.patch('/geekstore/items/:itemId', updateGeekstoreItem);
-router.patch('/geekstore/items/:itemId/update', updateGeekstoreItem);
+router.post('/geekstore/items', geekstoreImageUploader, addGeekstoreItem);
+router.post('/geekstore/items/add', geekstoreImageUploader, addGeekstoreItem);
+router.patch('/geekstore/items/:itemId', geekstoreImageUploader, updateGeekstoreItem);
+router.patch('/geekstore/items/:itemId/update', geekstoreImageUploader, updateGeekstoreItem);
 router.delete('/geekstore/items/:itemId', deleteGeekstoreItem);
 router.delete('/geekstore/items/:itemId/delete', deleteGeekstoreItem);
+router.post('/geekstore/items/:itemId/restore', restoreGeekstoreItem);
+router.patch('/geekstore/items/:itemId/restore', restoreGeekstoreItem);
+
+// Dedicated Image Upload via Backend Cloudinary
+router.post('/geekstore/upload', geekstoreImageUploader, uploadGeekstoreImage);
+router.post('/geekstore/upload-image', geekstoreImageUploader, uploadGeekstoreImage);
 
 router.get('/geekstore/orders', getAllGeekstoreOrders);
 router.get('/geekstore/orders/:orderId', getGeekstoreOrderByIdAdmin);

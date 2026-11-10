@@ -76,7 +76,6 @@ const registerUser = async (req, res) => {
                     where: { participantId: userId },
                     update: {},
                     create: {
-                        participantId: userId,
                         User: { connect: { githubId: userId } }
                     }
                 });

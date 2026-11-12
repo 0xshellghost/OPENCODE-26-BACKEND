@@ -22,11 +22,21 @@ export function response_204(res, message) {
     });
 }
 
-export function response_400(res, message) {
+export function response_400(res, message, fields) {
     return res.status(400).json({
         status: 'error',
         error: message,
-        message: message || "Bad request"
+        message: message || "Bad request",
+        fields
+    });
+}
+
+export function response_409(res, fields, message = 'Some details are already in use.') {
+    return res.status(409).json({
+        status: 'error',
+        error: message,
+        message,
+        fields
     });
 }
 

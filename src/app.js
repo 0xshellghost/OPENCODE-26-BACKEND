@@ -12,7 +12,26 @@ dotenv.config();
 const app = express();
 connDB();
 
-app.use(cors({ origin: true, credentials: true }));
+const allowedOrigins = new Set([
+    'https://events.geekhaven.in',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    ...(process.env.CORS_ORIGINS || '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+]);
+
+app.use(cors({
+    origin(origin, callback) {
+        // Requests without an Origin header include server-to-server calls and health checks.
+        if (!origin || allowedOrigins.has(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('Origin is not allowed by CORS'));
+    },
+    credentials: true
+}));
 app.use(cookieParser());
 app.use(express.json());  
 app.use(express.urlencoded({ extended: true }));

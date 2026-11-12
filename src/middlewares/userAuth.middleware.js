@@ -1,16 +1,20 @@
 import jwt from 'jsonwebtoken';
-import { response_401, response_500 } from '../utils/responseCodes.js';
+import { response_401 } from '../utils/responseCodes.js';
 
 const userAuth = async (req, res, next) => {
     
     //retrieve jwtToken value from client's request header
     const authHeader = req.headers['authorization'];
-    if (authHeader === null || authHeader === undefined) {
-        return response_401(res, 'Unauthorized');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return response_401(res, 'A valid Bearer token is required.');
     }
     try {
+        const token = authHeader.slice('Bearer '.length).trim();
+        if (!token) {
+            return response_401(res, 'A valid Bearer token is required.');
+        }
         const payload = jwt.verify(
-            authHeader.split(' ')[1],
+            token,
             process.env.JWT_SECRET
         );
         const id = payload.id;
@@ -20,8 +24,10 @@ const userAuth = async (req, res, next) => {
 
         next();
     } catch (error) {
-        // console.error(error);
-        response_500(res, 'Error while verifying token', error);
+        const message = error?.name === 'TokenExpiredError'
+            ? 'Your session has expired. Please sign in again.'
+            : 'Your session is invalid. Please sign in again.';
+        return response_401(res, message);
     }
 };
 

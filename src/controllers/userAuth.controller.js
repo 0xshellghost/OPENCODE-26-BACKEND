@@ -1,4 +1,5 @@
 import axios from 'axios';
+import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { response_401, response_500 } from '../utils/responseCodes.js';
 import dotenv from 'dotenv';
@@ -9,18 +10,44 @@ dotenv.config();
 // axios buggy with proxy. needs repair.
 axios.defaults.proxy = false;
 
+const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.COOKIE_SAME_SITE || 'lax'
+};
+
 const setCookie = (res, token) => {
     res.cookie('jwt', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.COOKIE_SAME_SITE || 'lax',
+        ...cookieOptions,
         maxAge: 7 * 24 * 60 * 60 * 1000
     });
 };
 
+const createSessionToken = (githubId, isAdmin, avatarUrl) =>
+    jwt.sign(
+        {
+            id: githubId,
+            githubId,
+            avatarUrl: avatarUrl || '',
+            roles: { isAdmin }
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+    );
+
 // Display the auth screen where user logs in to GitHub
 const userGitHubRedirect = async (req, res) => {
-    const userAuthScreenURL = `https://github.com/login/oauth/authorize?client_id=${process.env.CLIENT_ID}&state=${process.env.STATE}&scope=read:user`;
+    const state = crypto.randomBytes(32).toString('hex');
+    res.cookie('oauth_state', state, {
+        ...cookieOptions,
+        maxAge: 10 * 60 * 1000
+    });
+    const params = new URLSearchParams({
+        client_id: process.env.CLIENT_ID,
+        state,
+        scope: 'read:user user:email'
+    });
+    const userAuthScreenURL = `https://github.com/login/oauth/authorize?${params.toString()}`;
     return res.redirect(userAuthScreenURL);
 };
 
@@ -28,9 +55,11 @@ const userGitHubRedirect = async (req, res) => {
 const userTokenTransfer = async (req, res) => {
     const AUTH_CODE = req.query.code;
     const STATE = req.query.state;
+    const expectedState = req.cookies?.oauth_state;
+    res.clearCookie('oauth_state', cookieOptions);
 
-    // 1. Check if state was altered or missing (ALWAYS return to stop execution)
-    if (!STATE || STATE !== process.env.STATE) {
+    // The state is generated per login attempt and stored in an HttpOnly cookie.
+    if (!STATE || !expectedState || STATE !== expectedState) {
         return response_401(res, 'Unable to authorize you: Invalid state parameter');
     }
 
@@ -79,14 +108,10 @@ const userTokenTransfer = async (req, res) => {
 
             // Case A: User not registered yet
             if (!userData) {
-                const token = jwt.sign(
-                    {
-                        id: userGitHubData.login,
-                        roles: {
-                            isAdmin: false
-                        }
-                    },
-                    process.env.JWT_SECRET
+                const token = createSessionToken(
+                    userGitHubData.login,
+                    false,
+                    userGitHubData.avatar_url
                 );
                 setCookie(res, token);
                 return res.redirect(
@@ -125,14 +150,10 @@ const userTokenTransfer = async (req, res) => {
                     });
                 }
 
-                const token = jwt.sign(
-                    {
-                        id: userData.githubId,
-                        roles: {
-                            isAdmin: true
-                        }
-                    },
-                    process.env.JWT_SECRET
+                const token = createSessionToken(
+                    userData.githubId,
+                    true,
+                    userData.avatarUrl
                 );
                 setCookie(res, token);
                 return res.redirect(
@@ -143,14 +164,10 @@ const userTokenTransfer = async (req, res) => {
             }
 
             // Case C: Regular User
-            const token = jwt.sign(
-                {
-                    id: userData.githubId,
-                    roles: {
-                        isAdmin: false
-                    }
-                },
-                process.env.JWT_SECRET
+            const token = createSessionToken(
+                userData.githubId,
+                false,
+                userData.avatarUrl
             );
             setCookie(res, token);
             return res.redirect(

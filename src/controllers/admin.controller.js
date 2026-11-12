@@ -216,6 +216,229 @@ const setFlagshipEvent = async (req, res) => {
     }
 };
 
+const updateEvent = async (req, res) => {
+    try {
+        let { eventName } = req.params;
+        if (!eventName) {
+            return response_400(res, 'Event name is required to update event');
+        }
+
+        try {
+            eventName = decodeURIComponent(eventName);
+        } catch {}
+
+        const userId = req.user.id;
+        const admin = await prisma.admin.findUnique({
+            where: {
+                userId: userId
+            }
+        });
+
+        if (!admin) {
+            return response_403(res, 'Only admins can update events');
+        }
+
+        const existingEvent = await prisma.event.findFirst({
+            where: {
+                name: eventName,
+                deletedAt: null
+            },
+            include: {
+                coverImagesURL: true
+            }
+        });
+
+        if (!existingEvent) {
+            return response_404(res, `Event "${eventName}" not found`);
+        }
+
+        const { title, name, description, startDate, endDate, isFlagship, removeCoverImageIds } = req.body;
+        const newTitle = (title || name)?.trim();
+
+        // Validate dates if supplied
+        let parsedStart;
+        if (startDate) {
+            parsedStart = new Date(startDate);
+            if (isNaN(parsedStart.getTime())) {
+                return response_400(res, 'Invalid startDate format');
+            }
+        }
+
+        let parsedEnd;
+        if (endDate) {
+            parsedEnd = new Date(endDate);
+            if (isNaN(parsedEnd.getTime())) {
+                return response_400(res, 'Invalid endDate format');
+            }
+        }
+
+        if (parsedStart && parsedEnd && parsedEnd < parsedStart) {
+            return response_400(res, 'End date cannot be earlier than start date');
+        }
+
+        const logoFiles = req.files?.logoImage || [];
+        const coverFiles = req.files?.coverImages || [];
+
+        // Upload new logo if provided
+        let newLogoUrl = existingEvent.logoImageURL;
+        if (logoFiles.length > 0) {
+            const logoDataUri = (await getDataURI(logoFiles[0])).content;
+            const uploadRes = await cloudinary.uploader.upload(logoDataUri, {
+                resource_type: 'image',
+                folder: 'event',
+                format: 'png',
+                allowed_formats: ['png', 'jpg', 'jpeg'],
+                overwrite: true,
+                public_id: `eventImage-${newTitle || eventName}`
+            });
+            newLogoUrl = uploadRes.secure_url;
+        }
+
+        // Upload new cover images if provided
+        let newCoverUrls = [];
+        if (coverFiles.length > 0) {
+            newCoverUrls = await Promise.all(
+                coverFiles.map(async (coverFile, idx) => {
+                    const coverDataUri = (await getDataURI(coverFile)).content;
+                    const uploadRes = await cloudinary.uploader.upload(coverDataUri, {
+                        resource_type: 'image',
+                        folder: 'event',
+                        format: 'png',
+                        allowed_formats: ['png', 'jpg', 'jpeg'],
+                        overwrite: true,
+                        public_id: `coverImage-${newTitle || eventName}-${Date.now()}-${idx + 1}`
+                    });
+                    return uploadRes.secure_url;
+                })
+            );
+        }
+
+        const shouldSetFlagship = isFlagship !== undefined
+            ? (isFlagship === true || isFlagship === 'true' || isFlagship === 1 || isFlagship === '1')
+            : undefined;
+
+        // If setting flagship to true, unflag all other events first
+        if (shouldSetFlagship === true) {
+            await prisma.event.updateMany({
+                where: { isFlagship: true },
+                data: { isFlagship: false }
+            });
+        }
+
+        const updateFields = {
+            ...(description !== undefined && { description: description.trim() }),
+            ...(parsedStart && { startDate: parsedStart }),
+            ...(parsedEnd && { endDate: parsedEnd }),
+            ...(newLogoUrl && { logoImageURL: newLogoUrl }),
+            ...(shouldSetFlagship !== undefined && { isFlagship: shouldSetFlagship }),
+            updatedAt: new Date()
+        };
+
+        let finalEventName = eventName;
+
+        // Handle renaming event if title changed
+        if (newTitle && newTitle !== eventName) {
+            const nameTaken = await prisma.event.findFirst({
+                where: {
+                    name: newTitle,
+                    id: { not: existingEvent.id }
+                }
+            });
+
+            if (nameTaken) {
+                return response_400(res, `An event named "${newTitle}" already exists`);
+            }
+
+            // Transactional cascade update across relations
+            await prisma.$transaction([
+                prisma.event.update({
+                    where: { id: existingEvent.id },
+                    data: {
+                        ...updateFields,
+                        name: newTitle
+                    }
+                }),
+                prisma.repo.updateMany({
+                    where: { eventName: eventName },
+                    data: { eventName: newTitle }
+                }),
+                prisma.leaderboardEntry.updateMany({
+                    where: { eventName: eventName },
+                    data: { eventName: newTitle }
+                }),
+                prisma.leaderboardEvent.updateMany({
+                    where: { eventName: eventName },
+                    data: { eventName: newTitle }
+                }),
+                prisma.coverImageURL.updateMany({
+                    where: { eventName: eventName },
+                    data: { eventName: newTitle }
+                })
+            ]);
+
+            finalEventName = newTitle;
+        } else {
+            await prisma.event.update({
+                where: { id: existingEvent.id },
+                data: updateFields
+            });
+        }
+
+        // Add newly uploaded cover images
+        if (newCoverUrls.length > 0) {
+            await prisma.coverImageURL.createMany({
+                data: newCoverUrls.map((url) => ({
+                    url,
+                    eventName: finalEventName
+                }))
+            });
+        }
+
+        // Remove deleted cover images if requested
+        if (removeCoverImageIds) {
+            const rawIds = Array.isArray(removeCoverImageIds)
+                ? removeCoverImageIds
+                : String(removeCoverImageIds).split(',');
+            const parsedIds = rawIds.map((id) => Number(String(id).trim())).filter((id) => !isNaN(id));
+
+            if (parsedIds.length > 0) {
+                await prisma.coverImageURL.deleteMany({
+                    where: {
+                        id: { in: parsedIds },
+                        eventName: finalEventName
+                    }
+                });
+            }
+        }
+
+        const updatedEvent = await prisma.event.findUnique({
+            where: { id: existingEvent.id },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                startDate: true,
+                endDate: true,
+                isFlagship: true,
+                logoImageURL: true,
+                createdAt: true,
+                updatedAt: true,
+                coverImagesURL: {
+                    select: {
+                        id: true,
+                        url: true
+                    }
+                }
+            }
+        });
+
+        return response_200(res, 'Event updated successfully', updatedEvent);
+    } catch (error) {
+        console.error('Error updating event:', error);
+        return response_500(res, 'Error while updating event', error);
+    }
+};
+
 const getEvents = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -1102,6 +1325,7 @@ const uploadLeaderboard = async (req, res) => {
 
 export {
     createEvent,
+    updateEvent,
     deleteEvent,
     setFlagshipEvent,
     getEvents,

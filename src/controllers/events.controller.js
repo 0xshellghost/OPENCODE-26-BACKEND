@@ -1,5 +1,5 @@
 import prisma from '../config/db.config.js';
-import { response_500, response_200 } from '../utils/responseCodes.js';
+import { response_500, response_200, response_404 } from '../utils/responseCodes.js';
 import Fuse from 'fuse.js';
 
 const getAllEvents = async (req, res) => {
@@ -32,9 +32,15 @@ const getAllEvents = async (req, res) => {
 
 const getEvent = async (req, res) => {
     try {
-        let event = await prisma.event.findUnique({
+        let eventName = req.params.eventName;
+        try {
+            eventName = decodeURIComponent(eventName);
+        } catch {}
+
+        let event = await prisma.event.findFirst({
             where: {
-                name: req.params.eventName
+                name: eventName,
+                deletedAt: null
             },
             select: {
                 name: true,
@@ -45,6 +51,7 @@ const getEvent = async (req, res) => {
                 isFlagship: true,
                 coverImagesURL: {
                     select: {
+                        id: true,
                         url: true
                     }
                 },
@@ -56,12 +63,18 @@ const getEvent = async (req, res) => {
                 }
             }
         });
-        const formattedData = await (async () => {
-            event.numberOfParticipants = event._count.LeaderBoardEntries;
-            event.numberOfRepos = event._count.Repo;
-            delete event._count;
-            return event;
-        })(event);
+
+        if (!event) {
+            return response_404(res, `Event "${eventName}" not found`);
+        }
+
+        const formattedData = {
+            ...event,
+            numberOfParticipants: event._count?.LeaderBoardEntries || 0,
+            numberOfRepos: event._count?.Repo || 0
+        };
+        delete formattedData._count;
+
         return response_200(res, 'OK', formattedData);
     } catch (error) {
         response_500(res, 'Error', error);

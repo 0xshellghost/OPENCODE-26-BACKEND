@@ -5,6 +5,7 @@ import {
     renameRepo,
     updateRepoDetails,
     createEvent,
+    updateEvent,
     deleteEvent,
     setFlagshipEvent,
     getAllReposOfEvent,
@@ -59,6 +60,13 @@ router.delete('/:userId/removeMentor', removeMentorRole);
 // create Event
 //use postman
 router.post('/create', eventUploader, createEvent);
+// update Event
+router.patch('/event/:eventName/update', eventUploader, updateEvent);
+router.put('/event/:eventName/update', eventUploader, updateEvent);
+router.patch('/event/:eventName', eventUploader, updateEvent);
+router.put('/event/:eventName', eventUploader, updateEvent);
+router.patch('/update/:eventName', eventUploader, updateEvent);
+router.put('/update/:eventName', eventUploader, updateEvent);
 // delete Event
 router.delete('/delete/:eventName', deleteEvent);
 // get all created Event
